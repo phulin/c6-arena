@@ -25,6 +25,12 @@ python3 -m c6_arena replay policies/science.lua examples/science_decisions.json
 python3 -m c6_arena run policies/science.lua --until-victory --output runs/full-game
 ```
 
+To exercise late-game decisions sooner, add `--start-era ERA_INFORMATION`.
+This selects the original game's starting-era configuration, including its
+starting technologies and units. Results record the selected era; this is a
+different match from an Ancient-era start. `--regional-contact` selects the
+contact fixture used for focused diplomacy checks.
+
 `run` pits your script in seat 0 against `--reference` (default: `random.lua`)
 in seat 1. Barbarians, city states and Free Cities use the built-in AI, including
 its native planning and turn processing. Lua scripts control the two competing

@@ -1,7 +1,6 @@
 -- A science-victory strategy. Strategy and memory live in this file; the shared
 -- runtime supplies only permitted observations and already-legal choices.
--- The current native adapter supplies fewer observations/actions than the richer
--- context interface. Missing information is not treated as knowledge of the map.
+-- Missing information is not treated as knowledge of the map.
 local memory = {founded = 0, settlers_ordered = 0, visits = {}, trails = {}, last = {}, orders = {}, governors = {}, unit_types = {}, city_menu_turns = {}}
 local function name(option)
     local n = string.upper(option.name or option.action or "")
