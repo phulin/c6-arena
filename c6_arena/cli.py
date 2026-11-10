@@ -29,8 +29,8 @@ def parser() -> argparse.ArgumentParser:
                              help="default fast with fast acceleration; shadow checks native results")
         command.add_argument("--query-bindings", choices=("live", "owned"),
                              help="default owned with fast acceleration; live rechecks providers per query")
-        command.add_argument("--city-geometry", choices=("native", "shadow", "fast"), default="native",
-                             help="city plot-coordinate lookup kernel; shadow checks native results")
+        command.add_argument("--city-geometry", choices=("native", "shadow", "fast"),
+                             help="default fast with fast acceleration; shadow checks native coordinates")
         command.add_argument("--city-frame", choices=("native", "shadow", "fast"), default="native",
                              help="city economic kernel; shadow checks native results")
         command.add_argument("--rounds", type=int, default=None if name == "run" else 10)

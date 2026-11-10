@@ -242,6 +242,14 @@ Use `--query-bindings live --yield-neighbors native` to compare against the earl
 fast profile, or `--yield-neighbors shadow` to compare the kernel with native
 calculations. Resolved settings are retained in each match and inspection output.
 
+Fast runs also use the fused city plot-coordinate kernel. It reads the current
+Game, Map and offset tables and preserves native wrapping and sentinel rules.
+Use `--city-geometry native` for the unfused path or `--city-geometry shadow`
+for native coordinate comparisons.
+
+Bootstrap symbol inspection caches derived tables by current binary/tool content.
+Each run retains cache hit counts and costs in `preparation-timing.jsonl`.
+
 Use `--city-frame shadow` to compare the city economic kernel with native results,
 or `--city-frame fast` to execute its admitted building, district and entertainment
 paths. The default is `native`. Tile calculations retain their native fallback

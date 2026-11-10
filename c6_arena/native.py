@@ -80,7 +80,7 @@ def run_game(
     adapter: str = "full",
     acceleration: str | None = None,
     city_frame: str = "native",
-    city_geometry: str = "native",
+    city_geometry: str | None = None,
     query_bindings: str | None = None,
     yield_neighbors: str | None = None,
     regional_contact: bool = False,
@@ -95,6 +95,8 @@ def run_game(
         raise ValueError("acceleration must be native, or fast with the full adapter")
     if city_frame not in ("native", "shadow", "fast") or (city_frame != "native" and adapter != "full"):
         raise ValueError("city_frame must be native, or shadow/fast with the full adapter")
+    if city_geometry is None:
+        city_geometry = "fast" if acceleration == "fast" else "native"
     if city_geometry not in ("native", "shadow", "fast") or (city_geometry != "native" and adapter != "full"):
         raise ValueError("city_geometry must be native, or shadow/fast with the full adapter")
     if query_bindings is None:

@@ -192,7 +192,7 @@ class SchedulingTests(unittest.TestCase):
                              acceleration=acceleration, query_bindings=binding_mode,
                              yield_neighbors=neighbor_mode,
                              city_frame="shadow" if adapter == "full" else "native",
-                             city_geometry="shadow" if adapter == "full" else "native")
+                             city_geometry=None if acceleration is None else ("shadow" if adapter == "full" else "native"))
                     env = launch.call_args.kwargs["env"]
                     self.assertEqual(env["C6_ARENA_NATIVE_NPC_AI"], "1")
                     self.assertNotIn("C6_ARENA_LUA_POLICY_62", env)
@@ -215,8 +215,9 @@ class SchedulingTests(unittest.TestCase):
                     expected_neighbor = ("fast" if owned else "native") if acceleration is None else (
                         "shadow" if adapter == "full" else "native")
                     self.assertEqual(command[command.index("--yield-neighbor-kernel") + 1], expected_neighbor)
-                    self.assertEqual(command[command.index("--city-hexspace-kernel") + 1],
-                                     "shadow" if adapter == "full" else "native")
+                    expected_geometry = ("fast" if owned else "native") if acceleration is None else (
+                        "shadow" if adapter == "full" else "native")
+                    self.assertEqual(command[command.index("--city-hexspace-kernel") + 1], expected_geometry)
                     self.assertNotIn("--omit-ai-prep", command)
                     self.assertNotIn("--omit-research-prep", command)
 
