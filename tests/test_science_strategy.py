@@ -143,6 +143,8 @@ class ScienceStrategyTests(unittest.TestCase):
         self.assertEqual(self.choose("player_action", ["PASS", "RECRUIT_GREAT_PERSON"])["selected"], 2)
         self.assertEqual(self.choose("great_work", ["MOVE_GREAT_WORK", "KEEP_GREAT_WORKS"])["selected"], 2)
         self.assertEqual(self.choose("unit", ["skip", "REPAIR"])["selected"], 2)
+        self.assertEqual(self.choose("unit", ["skip", "UNITOPERATION_BUILD_IMPROVEMENT"])["selected"], 2)
+        self.assertEqual(self.choose("unit", ["skip", "UNITOPERATION_MAKE_TRADE_ROUTE"])["selected"], 2)
 
     def test_native_congress_metadata_avoids_incidental_diplomatic_victory(self):
         options = [{"name": "ResolutionPlayerTarget", "value": 1,

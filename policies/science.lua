@@ -3,7 +3,12 @@
 -- The current native adapter supplies fewer observations/actions than the richer
 -- context interface. Missing information is not treated as knowledge of the map.
 local memory = {founded = 0, settlers_ordered = 0, visits = {}, trails = {}, last = {}, orders = {}, governors = {}, unit_types = {}, city_menu_turns = {}}
-local function name(option) return string.upper(option.name or option.action or "") end
+local function name(option)
+    local n = string.upper(option.name or option.action or "")
+    n = n:gsub("^UNITOPERATION_", ""):gsub("^UNITCOMMAND_", "")
+    if n == "MAKE_TRADE_ROUTE" then n = "ESTABLISH_TRADE_ROUTE" end
+    return n
+end
 local function key(x, y) return tostring(x) .. "," .. tostring(y) end
 local function clamp(x, a, b) return math.max(a, math.min(b, x)) end
 local function count(list, predicate)
@@ -213,6 +218,7 @@ local function unit_action(option, s)
     elseif n == "COUNTERSPY" then score = option.protects_spaceport and 250 or 60
     elseif n == "SPY_OPERATION" then score = option.steals_technology and 120 or 30
     elseif n == "ACTIVATE_GREAT_PERSON" then score = 200 + (option.science or 0) * 2 + (option.space_production or 0) * 3
+    elseif n == "BUILDING_PRODUCTION" or n == "DISTRICT_PRODUCTION" or n == "PROJECT_PRODUCTION" then score = 210
     elseif n == "SPREAD_RELIGION" then score = 10
     elseif n == "REBASE" then score = 40 + (option.defends_city and 80 or 0)
     elseif n == "DELETE_UNIT" then score = -900
