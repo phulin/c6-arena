@@ -87,8 +87,8 @@ def run_game(
         raise ValueError("supported horizon is 1..100 rounds; explicit exploration allows 1..1000")
     if not 0 <= seed < 2**64:
         raise ValueError("policy seed must be an unsigned 64-bit integer")
-    if not 1 <= timeout <= 900:
-        raise ValueError("native bootstrap timeout must be 1..900 seconds")
+    if not 1 <= timeout <= 3600:
+        raise ValueError("native game timeout must be 1..3600 seconds")
     if set(policies) != {0, 1}:
         raise ValueError("assign Lua scripts to major seats 0 and 1; NPCs use native AI")
     harness = harness.resolve()

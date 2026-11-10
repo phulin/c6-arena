@@ -173,7 +173,8 @@ team and victory type, followed by clean native shutdown. The summary then says
 interleaved Congress phases. This budget does not change the original game's
 turn limit or victory rules. Reaching the budget without a winner is a failure.
 Full-game runs use Lua per-unit scheduling to avoid repeated path queries for
-unselected units, and default to the bootstrap's 900-second execution limit.
+unselected units, and default to an 1800-second execution limit. Use `--timeout`
+to select a budget up to 3600 seconds for native NPC planning and long games.
 
 For an explicit boundary-discovery run, `run --explore --rounds 500` permits a
 longer requested horizon (up to 1000). Unsupported branches still stop and no
