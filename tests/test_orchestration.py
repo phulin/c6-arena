@@ -171,7 +171,8 @@ class SchedulingTests(unittest.TestCase):
                          "C6_ARENA_LUA_POLICY_63": "barbarian.lua",
                          "C6_ARENA_NATIVE_NPC_AI": "0",
                          "C6_NATIVE_CONTROLLER": "external"}
-            for adapter, acceleration in (("full", "native"), ("full", "fast"), ("limited", "native")):
+            for adapter, acceleration in (("full", "native"), ("full", "fast"), ("limited", "native"),
+                                          ("full", None), ("limited", None)):
                 with self.subTest(adapter=adapter, acceleration=acceleration), patch.dict("os.environ", inherited), patch(
                         "c6_arena.native.runner_lock", return_value=nullcontext()), patch(
                         "c6_arena.native.build_bridge", return_value=bridge), patch(
@@ -189,11 +190,12 @@ class SchedulingTests(unittest.TestCase):
                     self.assertNotIn("C6_NATIVE_CONTROLLER", env)
                     self.assertEqual(json.loads((output / "match.json").read_text())["npc_control"], "native")
                     command = launch.call_args.args[0]
-                    self.assertEqual("--getter-inline" in command, acceleration == "fast")
-                    self.assertEqual("--plt-binding" in command, acceleration == "fast")
-                    self.assertEqual("--appeal-reuse" in command, acceleration == "fast")
-                    self.assertEqual("--appeal-scalar-kernel" in command, acceleration == "fast")
-                    self.assertEqual("--map-xy-kernel" in command, acceleration == "fast")
+                    fast = acceleration == "fast" or (acceleration is None and adapter == "full")
+                    self.assertEqual("--getter-inline" in command, fast)
+                    self.assertEqual("--plt-binding" in command, fast)
+                    self.assertEqual("--appeal-reuse" in command, fast)
+                    self.assertEqual("--appeal-scalar-kernel" in command, fast)
+                    self.assertEqual("--map-xy-kernel" in command, fast)
                     self.assertNotIn("--omit-ai-prep", command)
                     self.assertNotIn("--omit-research-prep", command)
 

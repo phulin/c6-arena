@@ -40,7 +40,7 @@ Use `--harness /path/to/c6-native-arena` to select a different checkout.
 The native harness requires its compiled inputs to be committed before launch.
 The runner uses the harness's compiler cache when `ccache` is available.
 
-`--acceleration fast` reuses the harness's exact getter, call-binding, map and
+Full runs default to `--acceleration fast`, which reuses the harness's getter, call-binding, map and
 appeal optimizations. NPC planning, caches and turn processing remain native.
 The appeal replacement applies within its supported citizen-query scope and
 falls back to the original calculation elsewhere. The run records its selected

@@ -23,8 +23,8 @@ def parser() -> argparse.ArgumentParser:
         command.add_argument("--harness", type=Path, default=DEFAULT_HARNESS)
         command.add_argument("--output", type=Path, required=True)
         command.add_argument("--adapter", choices=("full", "limited"), default="full")
-        command.add_argument("--acceleration", choices=("native", "fast"), default="native",
-                             help="reuse exact native optimizations with full NPC AI")
+        command.add_argument("--acceleration", choices=("native", "fast"),
+                             help="default fast with full adapter; native for reference runs")
         command.add_argument("--rounds", type=int, default=None if name == "run" else 10)
         command.add_argument("--timeout", type=int, default=None if name == "run" else 600)
         if name == "run":

@@ -16,7 +16,7 @@ def paired_schedule(seeds: list[int]) -> list[dict]:
 
 def compare(candidate: Path, reference: Path, output: Path, *, seeds: list[int],
             rounds: int = 10, timeout: int = 600, harness: Path = DEFAULT_HARNESS,
-            adapter: str = "full", acceleration: str = "native") -> dict:
+            adapter: str = "full", acceleration: str | None = None) -> dict:
     schedule = paired_schedule(seeds)
     if not 1 <= rounds <= 100 or timeout <= 0:
         raise ValueError("rounds must be 1..100 and timeout positive")

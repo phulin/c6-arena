@@ -78,13 +78,15 @@ def run_game(
     exploratory: bool = False,
     until_victory: bool = False,
     adapter: str = "full",
-    acceleration: str = "native",
+    acceleration: str | None = None,
     regional_contact: bool = False,
     start_era: str | None = None,
     trace_crash: bool = False,
 ) -> dict:
     if adapter not in ("full", "limited"):
         raise ValueError("adapter must be full or limited")
+    if acceleration is None:
+        acceleration = "fast" if adapter == "full" else "native"
     if acceleration not in ("native", "fast") or (acceleration == "fast" and adapter != "full"):
         raise ValueError("acceleration must be native, or fast with the full adapter")
     if not 1 <= rounds <= (1000 if exploratory or until_victory else 100):
