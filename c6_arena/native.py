@@ -112,6 +112,7 @@ def run_game(
                if not key.startswith(("C6_ARENA_", "C6_NATIVE_"))}
         env["C6_ARENA_POLICY_LIBRARY"] = str(bridge)
         env["C6_ARENA_POLICY_TRACE"] = str(output / "decisions.jsonl")
+        env["C6_ARENA_POLICY_TIMING"] = "1"
         env["C6_ARENA_NATIVE_NPC_AI"] = "1"
         if adapter == "full":
             env["C6_ARENA_ADAPTER"] = "full"

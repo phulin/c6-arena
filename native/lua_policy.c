@@ -3,9 +3,11 @@
 #include "context_api.h"
 #include "lua51.h"
 #include <math.h>
+#include <inttypes.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 
 /* Synchronous policy calls only, on the harness thread. A VM per owner keeps
  * strategy memory private. This limits accidental runaway scripts; it is not
@@ -14,7 +16,10 @@
 #define SOURCE_LIMIT (1024u * 1024u)
 #define HOOK_INTERVAL 1000
 #define HOOK_TICKS 1000
-struct policy { lua_State *vm; size_t bytes; int ref, ticks; };
+struct policy_timing {
+    uint64_t calls, loads, failures, load_ns, marshal_ns, lua_ns, trace_ns, bridge_ns;
+};
+struct policy { lua_State *vm; size_t bytes; int ref, ticks; struct policy_timing timing; };
 static struct policy policies[64];
 static struct policy *active;
 static const struct c6_policy_request_v1 *request;
@@ -23,6 +28,22 @@ static FILE *trace;
 static const struct c6_value_v1 *context;
 static char last_reason[512];
 static unsigned context_nodes;
+static int timing_enabled;
+static uint64_t cpu_ns(void) {
+    if(!timing_enabled)return 0;
+    struct timespec t;clock_gettime(CLOCK_THREAD_CPUTIME_ID,&t);
+    return (uint64_t)t.tv_sec*UINT64_C(1000000000)+(uint64_t)t.tv_nsec;
+}
+const char *c6_arena_policy_timing_json_v1(int32_t owner) {
+    static char json[768];
+    if(owner<0||owner>=64)return NULL;
+    const struct policy_timing *t=&policies[owner].timing;
+    snprintf(json,sizeof json,"{\"owner\":%d,\"calls\":%" PRIu64 ",\"loads\":%" PRIu64
+        ",\"failures\":%" PRIu64 ",\"load_cpu_ns\":%" PRIu64 ",\"marshal_cpu_ns\":%" PRIu64
+        ",\"lua_cpu_ns\":%" PRIu64 ",\"trace_cpu_ns\":%" PRIu64 ",\"bridge_cpu_ns\":%" PRIu64 "}",
+        owner,t->calls,t->loads,t->failures,t->load_ns,t->marshal_ns,t->lua_ns,t->trace_ns,t->bridge_ns);
+    return json;
+}
 
 static void *allocate(void *ud, void *ptr, size_t old, size_t size) {
     struct policy *p=ud;
@@ -87,7 +108,7 @@ static void json_value(FILE *out,const struct c6_value_v1 *v) {
         fputc(v->type==C6_ARRAY?']':'}',out);
     }
 }
-static void log_choice(uint32_t selected,const char *error) {
+static void log_choice_impl(uint32_t selected,const char *error) {
     if(!trace)return;
     fprintf(trace,"{\"sequence\":%lu,\"owner\":%d,\"kind\":",sequence++,request->owner);
     json_string(trace,request->kind);
@@ -121,6 +142,10 @@ static void log_choice(uint32_t selected,const char *error) {
     if(error)json_string(trace,error);else fputs("null",trace);
     fputs(",\"reason\":",trace);json_string(trace,last_reason);
     fputs("}\n",trace);fflush(trace);
+}
+static void log_choice(uint32_t selected,const char *error) {
+    uint64_t start=cpu_ns();log_choice_impl(selected,error);
+    if(active)active->timing.trace_ns+=cpu_ns()-start;
 }
 static int fail(lua_State *vm,const char *message) {
     const char *detail=vm?lua_tolstring(vm,-1,NULL):NULL;
@@ -176,8 +201,12 @@ static void push_value(lua_State *vm,const struct c6_value_v1 *v,unsigned depth)
     }
 }
 static int call_policy(lua_State *vm) {
+    uint64_t start=cpu_ns();
     lua_rawgeti(vm,LUA_REGISTRYINDEX,active->ref);
-    if(context){push_value(vm,context,0);lua_call(vm,1,2);return 2;}
+    if(context){
+        push_value(vm,context,0);active->timing.marshal_ns+=cpu_ns()-start;
+        lua_call(vm,1,2);return 2;
+    }
     lua_createtable(vm,0,4);
     string_field(vm,"kind",request->kind);integer_field(vm,"owner",request->owner);
     integer_field(vm,"random_index",request->random_index+1);
@@ -191,10 +220,16 @@ static int call_policy(lua_State *vm) {
         if(o->flags&2){integer_field(vm,"origin_x",o->origin_x);integer_field(vm,"origin_y",o->origin_y);}
         lua_rawseti(vm,-2,(int)i+1);
     }
-    lua_setfield(vm,-2,"options");lua_call(vm,1,2);return 2;
+    lua_setfield(vm,-2,"options");active->timing.marshal_ns+=cpu_ns()-start;
+    lua_call(vm,1,2);return 2;
 }
 int c6_arena_policy_reset_v1(void) {
-    for(unsigned i=0;i<64;++i){if(policies[i].vm)lua_close(policies[i].vm);policies[i]=(struct policy){0};}
+    for(unsigned i=0;i<64;++i){
+        if(timing_enabled&&policies[i].timing.calls)
+            fprintf(stderr,"C6_LUA_TIMING %s\n",c6_arena_policy_timing_json_v1((int32_t)i));
+        if(policies[i].vm)lua_close(policies[i].vm);
+        policies[i]=(struct policy){0};
+    }
     active=NULL;request=NULL;sequence=0;context=NULL;last_reason[0]=0;
     if(trace){fclose(trace);trace=NULL;}
     return 0;
@@ -202,17 +237,25 @@ int c6_arena_policy_reset_v1(void) {
 __attribute__((destructor)) static void release_policy_states(void) {
     c6_arena_policy_reset_v1();
 }
-static int execute_choice(const struct c6_policy_request_v1 *r,uint32_t *selected) {
+static int execute_choice_impl(const struct c6_policy_request_v1 *r,uint32_t *selected) {
     if(!r||!selected||r->abi_version!=1||r->owner<0||r->owner>=64||
        !r->kind||!r->count||r->count>4096||(!context&&!r->options)||r->random_index>=r->count)return 197;
     last_reason[0]=0;context_nodes=0;
     request=r;active=policies+r->owner;
     const char *trace_path=getenv("C6_ARENA_POLICY_TRACE");
     if(!trace&&trace_path){trace=fopen(trace_path,"a");if(!trace)return fail(NULL,"cannot open trace");}
-    if(!active->vm&&load_policy(active,r->owner))return 197;
+    if(!active->vm){
+        uint64_t start=cpu_ns();++active->timing.loads;
+        int status=load_policy(active,r->owner);active->timing.load_ns+=cpu_ns()-start;
+        if(status)return status;
+    }
     lua_State *vm=active->vm;lua_settop(vm,0);active->ticks=HOOK_TICKS;
     lua_pushcclosure(vm,call_policy,0);
-    if(lua_pcall(vm,0,2,0))return fail(vm,"choice failed");
+    uint64_t start=cpu_ns(),marshal_before=active->timing.marshal_ns;
+    int status=lua_pcall(vm,0,2,0);
+    uint64_t elapsed=cpu_ns()-start,marshalled=active->timing.marshal_ns-marshal_before;
+    active->timing.lua_ns+=elapsed>=marshalled?elapsed-marshalled:0;
+    if(status)return fail(vm,"choice failed");
     double index=lua_tonumber(vm,-2);
     if(lua_type(vm,-2)!=LUA_TNUMBER||!(index>=1&&index<=r->count)||index!=(uint32_t)index)
         return fail(NULL,"choice must be an integer index into options");
@@ -220,6 +263,15 @@ static int execute_choice(const struct c6_policy_request_v1 *r,uint32_t *selecte
     if(reason)snprintf(last_reason,sizeof last_reason,"%s",reason);
     *selected=(uint32_t)index-1;lua_settop(vm,0);log_choice(*selected,NULL);
     return 0;
+}
+static int execute_choice(const struct c6_policy_request_v1 *r,uint32_t *selected) {
+    const char *enabled=getenv("C6_ARENA_POLICY_TIMING");timing_enabled=enabled&&!strcmp(enabled,"1");
+    uint64_t start=cpu_ns();int status=execute_choice_impl(r,selected);
+    if(r&&r->owner>=0&&r->owner<64){
+        struct policy_timing *t=&policies[r->owner].timing;
+        ++t->calls;t->failures+=!!status;t->bridge_ns+=cpu_ns()-start;
+    }
+    return status;
 }
 int c6_arena_choose_v1(const struct c6_policy_request_v1 *r,uint32_t *selected) {
     context=NULL;return execute_choice(r,selected);

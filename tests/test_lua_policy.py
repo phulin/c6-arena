@@ -117,6 +117,19 @@ class LuaPolicyTests(unittest.TestCase):
         self.lib.c6_arena_policy_reset_v1()
         self.assertEqual(self.choose(owner=0), (0, 0))
 
+    def test_timing_separates_one_load_from_repeated_decisions(self):
+        with patch.dict(os.environ, {"C6_ARENA_POLICY_TIMING": "1"}):
+            self.assertEqual(self.choose("local n=0; return function(ctx) n=n+1; return n end"), (0, 0))
+            self.assertEqual(self.choose(), (0, 1))
+            self.lib.c6_arena_policy_timing_json_v1.argtypes = [ctypes.c_int32]
+            self.lib.c6_arena_policy_timing_json_v1.restype = ctypes.c_char_p
+            timing = json.loads(self.lib.c6_arena_policy_timing_json_v1(0))
+            self.assertEqual((timing["loads"], timing["calls"], timing["failures"]), (1, 2, 0))
+            for field in ("load_cpu_ns", "marshal_cpu_ns", "lua_cpu_ns", "trace_cpu_ns"):
+                self.assertGreater(timing[field], 0)
+            self.assertGreaterEqual(timing["bridge_cpu_ns"], sum(timing[field] for field in
+                ("load_cpu_ns", "marshal_cpu_ns", "lua_cpu_ns", "trace_cpu_ns")))
+
     def test_bad_results_stop_without_fallback(self):
         for value in ("0", "3", "1.5", "'1'", "nil", "{}", "0/0", "math.huge"):
             with self.subTest(value=value):
