@@ -118,13 +118,16 @@ class LuaPolicyTests(unittest.TestCase):
         self.assertEqual(self.choose(owner=0), (0, 0))
 
     def test_timing_separates_one_load_from_repeated_decisions(self):
-        with patch.dict(os.environ, {"C6_ARENA_POLICY_TIMING": "1"}):
+        timing_path = self.path / "timing.jsonl"
+        with patch.dict(os.environ, {"C6_ARENA_POLICY_TIMING": "1",
+                                    "C6_ARENA_POLICY_TIMING_FILE": str(timing_path)}):
             self.assertEqual(self.choose("local n=0; return function(ctx) n=n+1; return n end"), (0, 0))
             self.assertEqual(self.choose(), (0, 1))
             self.lib.c6_arena_policy_timing_json_v1.argtypes = [ctypes.c_int32]
             self.lib.c6_arena_policy_timing_json_v1.restype = ctypes.c_char_p
             timing = json.loads(self.lib.c6_arena_policy_timing_json_v1(0))
             self.assertEqual((timing["loads"], timing["calls"], timing["failures"]), (1, 2, 0))
+            self.assertEqual(json.loads(timing_path.read_text().splitlines()[-1]), timing)
             for field in ("load_cpu_ns", "marshal_cpu_ns", "lua_cpu_ns", "trace_cpu_ns"):
                 self.assertGreater(timing[field], 0)
             self.assertGreaterEqual(timing["bridge_cpu_ns"], sum(timing[field] for field in

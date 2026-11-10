@@ -102,6 +102,15 @@ def inspect_game(directory: Path) -> dict:
                            and (not match.get("until_victory") or terminal_within_budget),
     }
     complete = all(checks.values())
+    policy_timing = {}
+    timing_path = directory / "policy-timing.jsonl"
+    if timing_path.exists():
+        for line in timing_path.read_text().splitlines():
+            try:
+                timing = json.loads(line)
+                policy_timing[str(timing["owner"])] = timing
+            except (ValueError, KeyError, TypeError):
+                continue
     return {
         "schema": 1, "directory": str(directory),
         "outcome": ("finished" if terminal else "truncated") if complete else "coverage_failure",
@@ -130,6 +139,7 @@ def inspect_game(directory: Path) -> dict:
                                 any(token in line.lower() for token in (
                                     "unsupported", "refusal", "failure", "choice_failed", "boundary_stall")))][-10:],
         "policies": match.get("policies", {}),
+        "policy_timing": policy_timing,
         "diagnostics": {key: arena.get(key) for key in (
             "final_cities", "final_units", "founded_cities", "submitted_orders",
             "submitted_found_city", "submitted_skip", "submitted_move",

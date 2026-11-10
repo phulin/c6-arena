@@ -113,6 +113,7 @@ def run_game(
         env["C6_ARENA_POLICY_LIBRARY"] = str(bridge)
         env["C6_ARENA_POLICY_TRACE"] = str(output / "decisions.jsonl")
         env["C6_ARENA_POLICY_TIMING"] = "1"
+        env["C6_ARENA_POLICY_TIMING_FILE"] = str(output / "policy-timing.jsonl")
         env["C6_ARENA_NATIVE_NPC_AI"] = "1"
         if adapter == "full":
             env["C6_ARENA_ADAPTER"] = "full"

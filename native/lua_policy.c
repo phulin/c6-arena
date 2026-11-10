@@ -25,6 +25,7 @@ static struct policy *active;
 static const struct c6_policy_request_v1 *request;
 static unsigned long sequence;
 static FILE *trace;
+static FILE *timing_trace;
 static const struct c6_value_v1 *context;
 static char last_reason[512];
 static unsigned context_nodes;
@@ -232,6 +233,7 @@ int c6_arena_policy_reset_v1(void) {
     }
     active=NULL;request=NULL;sequence=0;context=NULL;last_reason[0]=0;
     if(trace){fclose(trace);trace=NULL;}
+    if(timing_trace){fclose(timing_trace);timing_trace=NULL;}
     return 0;
 }
 __attribute__((destructor)) static void release_policy_states(void) {
@@ -270,6 +272,14 @@ static int execute_choice(const struct c6_policy_request_v1 *r,uint32_t *selecte
     if(r&&r->owner>=0&&r->owner<64){
         struct policy_timing *t=&policies[r->owner].timing;
         ++t->calls;t->failures+=!!status;t->bridge_ns+=cpu_ns()-start;
+        const char *path=getenv("C6_ARENA_POLICY_TIMING_FILE");
+        if(timing_enabled&&path){
+            if(!timing_trace)timing_trace=fopen(path,"a");
+            if(timing_trace){
+                fprintf(timing_trace,"%s\n",c6_arena_policy_timing_json_v1(r->owner));
+                fflush(timing_trace);
+            }
+        }
     }
     return status;
 }
