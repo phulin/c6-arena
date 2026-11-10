@@ -59,7 +59,7 @@ Lua's unseeded random functions are unavailable.
 | `research`, `civic`, `commemoration` | `name` (original definition type, e.g. `TECH_WRITING`), `value` (native definition index) |
 | `government`, `policy`, `religion` | Native government, policy, or pantheon belief name and definition index; policy `actor` identifies its slot |
 | `governor` | Governor/promotion type name, or `ASSIGN_GOVERNOR` with governor actor, city ID, and city coordinates |
-| `congress` | Legal resolution target/option and vote-count choices, or results acknowledgement |
+| `congress` | Legal resolution targets, discussion vote directions, vote counts, or results acknowledgement |
 
 All options also have `index`. Coordinates are flat `x`, `y`, `origin_x`,
 `origin_y` fields, omitted when unknown. Each seat has its own Lua VM. Basic
@@ -169,9 +169,9 @@ winner is inferred from diagnostics or the requested horizon.
 The native API exposes the existing legal-choice subset, not a complete map or
 player observation. It covers unit orders and queued intent, production from a
 bounded pool (including Free Cities), research, civics, era dedications, mandatory
-policy/governor/pantheon choices, regular Congress ballots and result dismissal.
-Reopened human turns return to Lua for further unit orders. Discussion ballots
-and other unsupported branches still stop explicitly. City/unit totals combine
+policy/governor/pantheon choices, Congress ballots and result dismissal.
+Reopened human turns return to Lua for further unit orders. Unsupported branches
+still stop explicitly. City/unit totals combine
 both major seats; they never determine the winner. Full map observations,
 broader action coverage, checkpoint branching and automatic LLM mutation remain
 future extensions.
