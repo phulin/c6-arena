@@ -81,6 +81,7 @@ def run_game(
     acceleration: str | None = None,
     city_frame: str = "native",
     query_bindings: str = "live",
+    yield_neighbors: str = "native",
     regional_contact: bool = False,
     start_era: str | None = None,
     trace_crash: bool = False,
@@ -95,6 +96,8 @@ def run_game(
         raise ValueError("city_frame must be native, or shadow/fast with the full adapter")
     if query_bindings not in ("live", "owned") or (query_bindings == "owned" and acceleration != "fast"):
         raise ValueError("owned query_bindings require fast acceleration")
+    if yield_neighbors not in ("native", "shadow", "fast") or (yield_neighbors != "native" and adapter != "full"):
+        raise ValueError("yield_neighbors must be native, or shadow/fast with the full adapter")
     if not 1 <= rounds <= (1000 if exploratory or until_victory else 100):
         raise ValueError("supported horizon is 1..100 rounds; explicit exploration allows 1..1000")
     if not 0 <= seed < 2**64:
@@ -161,7 +164,7 @@ def run_game(
                 "--map-coordinate-kernel", "fast", "--map-xy-kernel", "fast",
                 "--city-attributes-kernel", "fast", "--global-definitions-kernel", "fast",
             ])
-        command.extend(["--city-player-frame", city_frame])
+        command.extend(["--city-player-frame", city_frame, "--yield-neighbor-kernel", yield_neighbors])
         if start_era:
             command.extend(["--start-era", start_era])
         if trace_crash:
@@ -176,6 +179,7 @@ def run_game(
                     "acceleration": acceleration,
                     "city_frame": city_frame,
                     "query_bindings": query_bindings,
+                    "yield_neighbors": yield_neighbors,
                     "npc_control": "native",
                     "fixture": "+".join(fixtures) or None,
                     "start_era": start_era or "ERA_ANCIENT",

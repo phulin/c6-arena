@@ -187,7 +187,8 @@ class SchedulingTests(unittest.TestCase):
                     output = root / f"{adapter}-{acceleration}"
                     owned = acceleration == "fast"
                     run_game({0: script, 1: script}, output, harness=harness, adapter=adapter,
-                             acceleration=acceleration, query_bindings="owned" if owned else "live", city_frame="shadow" if adapter == "full" else "native")
+                             acceleration=acceleration, query_bindings="owned" if owned else "live",
+                             yield_neighbors="shadow" if adapter == "full" else "native", city_frame="shadow" if adapter == "full" else "native")
                     env = launch.call_args.kwargs["env"]
                     self.assertEqual(env["C6_ARENA_NATIVE_NPC_AI"], "1")
                     self.assertNotIn("C6_ARENA_LUA_POLICY_62", env)
@@ -204,6 +205,8 @@ class SchedulingTests(unittest.TestCase):
                     self.assertEqual("--appeal-scalar-kernel" in command, fast)
                     self.assertEqual("--map-xy-kernel" in command, fast)
                     self.assertEqual(command[command.index("--city-player-frame") + 1],
+                                     "shadow" if adapter == "full" else "native")
+                    self.assertEqual(command[command.index("--yield-neighbor-kernel") + 1],
                                      "shadow" if adapter == "full" else "native")
                     self.assertNotIn("--omit-ai-prep", command)
                     self.assertNotIn("--omit-research-prep", command)
