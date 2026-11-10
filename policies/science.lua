@@ -310,6 +310,17 @@ local function score_option(ctx, option, s)
         return -10
     end
     if kind == "city_yield_focus" then return n == "BACK" and 10 or 0 end
+    if kind == "city_combat" then return n == "PASS" and 0 or 100 + (option.damage_dealt or 0) end
+    if kind == "governor_optional" then
+        if n == "PASS" then return 0 end
+        if option.city_owner ~= nil and option.city_owner ~= ctx.owner then return -20 end
+        local function value(city)
+            return (city.population or 0) * 6 + (city.production or 0) * 2
+                + (option.governor_name == "GOVERNOR_THE_EDUCATOR" and (city.science or 0) * 8 or 0)
+        end
+        return value(s.cities[option.city_id or option.value] or {})
+            - value(s.cities[option.source_city_id] or {}) - 10
+    end
     if kind == "great_work" then return (n == "KEEP" or n == "PASS" or n == "KEEP_GREAT_WORKS") and 10 or 0 end
     if kind == "government_optional" then
         if n == "REASSIGN_POLICIES" or n == "APPLY_POLICY_CHANGES" then return 10 end
