@@ -241,6 +241,8 @@ neighbors on each request. NPC AI, planning, caches and observers remain native.
 Use `--query-bindings live --yield-neighbors native` to compare against the earlier
 fast profile, or `--yield-neighbors shadow` to compare the kernel with native
 calculations. Resolved settings are retained in each match and inspection output.
+`--neighbor-geometry fast` fuses the six current neighbor lookups within that
+kernel and uses an integer-only bridge; `native` retains the earlier lookup path.
 
 Fast runs also use the fused city plot-coordinate kernel. It reads the current
 Game, Map and offset tables and preserves native wrapping and sentinel rules.

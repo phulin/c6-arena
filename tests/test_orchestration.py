@@ -189,10 +189,11 @@ class SchedulingTests(unittest.TestCase):
                     owned = acceleration == "fast" or (acceleration is None and adapter == "full")
                     binding_mode = None if acceleration is None else ("owned" if owned else "live")
                     neighbor_mode = None if acceleration is None else ("shadow" if adapter == "full" else "native")
+                    geometry_mode = "fast" if acceleration == "fast" else "native"
                     amenities_mode = "shadow" if adapter == "full" and acceleration == "fast" and frame_mode == "native" else None
                     run_game({0: script, 1: script}, output, harness=harness, adapter=adapter,
                              acceleration=acceleration, query_bindings=binding_mode,
-                             yield_neighbors=neighbor_mode,
+                             yield_neighbors=neighbor_mode, neighbor_geometry=geometry_mode,
                              city_frame=frame_mode, amenities_index=amenities_mode,
                              city_geometry=None if acceleration is None else ("shadow" if adapter == "full" else "native"))
                     env = launch.call_args.kwargs["env"]
@@ -216,6 +217,7 @@ class SchedulingTests(unittest.TestCase):
                     expected_neighbor = ("fast" if owned else "native") if acceleration is None else (
                         "shadow" if adapter == "full" else "native")
                     self.assertEqual(command[command.index("--yield-neighbor-kernel") + 1], expected_neighbor)
+                    self.assertEqual(command[command.index("--yield-neighbor-geometry") + 1], geometry_mode)
                     expected_geometry = ("fast" if owned else "native") if acceleration is None else (
                         "shadow" if adapter == "full" else "native")
                     self.assertEqual(command[command.index("--city-hexspace-kernel") + 1], expected_geometry)

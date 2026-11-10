@@ -27,6 +27,8 @@ def parser() -> argparse.ArgumentParser:
                              help="default fast with full adapter; native for reference runs")
         command.add_argument("--yield-neighbors", choices=("native", "shadow", "fast"),
                              help="default fast with fast acceleration; shadow checks native results")
+        command.add_argument("--neighbor-geometry", choices=("native", "fast"), default="native",
+                             help="fuse the six neighbor lookups within the yield kernel")
         command.add_argument("--query-bindings", choices=("live", "owned"),
                              help="default owned with fast acceleration; live rechecks providers per query")
         command.add_argument("--city-geometry", choices=("native", "shadow", "fast"),
@@ -73,13 +75,13 @@ def main() -> int:
                               timeout=args.timeout if args.timeout is not None else (1800 if args.until_victory else 600),
                               exploratory=args.explore,
                               until_victory=args.until_victory, adapter=args.adapter,
-                              acceleration=args.acceleration, city_frame=args.city_frame, amenities_index=args.amenities_index, city_geometry=args.city_geometry, query_bindings=args.query_bindings, yield_neighbors=args.yield_neighbors,
+                              acceleration=args.acceleration, city_frame=args.city_frame, amenities_index=args.amenities_index, city_geometry=args.city_geometry, query_bindings=args.query_bindings, yield_neighbors=args.yield_neighbors, neighbor_geometry=args.neighbor_geometry,
                               regional_contact=args.regional_contact, start_era=args.start_era,
                               trace_crash=args.trace_crash)
         elif args.command == "compare":
             result = compare(args.candidate, args.reference, args.output, seeds=args.seeds,
                              harness=args.harness, rounds=args.rounds, timeout=args.timeout,
-                             adapter=args.adapter, acceleration=args.acceleration, city_frame=args.city_frame, amenities_index=args.amenities_index, city_geometry=args.city_geometry, query_bindings=args.query_bindings, yield_neighbors=args.yield_neighbors)
+                             adapter=args.adapter, acceleration=args.acceleration, city_frame=args.city_frame, amenities_index=args.amenities_index, city_geometry=args.city_geometry, query_bindings=args.query_bindings, yield_neighbors=args.yield_neighbors, neighbor_geometry=args.neighbor_geometry)
         elif args.command == "schedule":
             result = paired_schedule(args.seeds)
         elif args.command == "replay":

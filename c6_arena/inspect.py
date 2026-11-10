@@ -173,6 +173,7 @@ def inspect_game(directory: Path) -> dict:
         "city_geometry": match.get("city_geometry", "native"),
         "query_bindings": match.get("query_bindings", "live"),
         "yield_neighbors": match.get("yield_neighbors", "native"),
+        "neighbor_geometry": match.get("neighbor_geometry", "native"),
         "npc_control": match.get("npc_control"),
         "native_status": arena.get("status"), "native_phase": arena.get("phase"),
         "completed_half_turns": arena.get("completed_half_turns"),
