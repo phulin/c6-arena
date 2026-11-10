@@ -40,6 +40,9 @@ class InspectionTests(unittest.TestCase):
         self.assertEqual(result["delayed_founding_choices"], 1)
 
     def test_actual_native_victory_can_finish_before_requested_horizon(self):
+        match = json.loads((self.path / "match.json").read_text())
+        match["policies"] = {"1": {"source": "/strategies/winner.lua"}}
+        write_json(self.path / "match.json", match)
         arena = json.loads((self.path / "native/arena.json").read_text())
         arena.update(game_over=True, winner_team=7, winner_player=1, victory_type=2,
                      victory_name="VICTORY_SCORE", completed_half_turns=3, final_turn=1)
@@ -49,6 +52,7 @@ class InspectionTests(unittest.TestCase):
         self.assertEqual(result["winner"], 1)
         self.assertEqual(result["winner_team"], 7)
         self.assertEqual(result["victory_name"], "VICTORY_SCORE")
+        self.assertEqual(result["winner_policy"], "/strategies/winner.lua")
 
     def test_partial_victory_record_is_not_a_win(self):
         arena = json.loads((self.path / "native/arena.json").read_text())

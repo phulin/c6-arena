@@ -63,6 +63,7 @@ def inspect_game(directory: Path) -> dict:
                 and (arena.get("winner_player") is None or
                      type(arena["winner_player"]) is int and 0 <= arena["winner_player"] < 64))
     terminal_within_budget = (terminal and type(rounds) is int
+        and arena.get("requested_rounds") == rounds
         and type(arena.get("completed_half_turns")) is int
         and 0 <= arena["completed_half_turns"] <= rounds * 2)
     checks = {
@@ -87,6 +88,8 @@ def inspect_game(directory: Path) -> dict:
         "schema": 1, "directory": str(directory),
         "outcome": ("finished" if terminal else "truncated") if complete else "coverage_failure",
         "winner": arena.get("winner_player") if complete and terminal else None,
+        "winner_policy": match.get("policies", {}).get(str(arena.get("winner_player")), {}).get("source")
+                         if complete and terminal else None,
         "winner_team": arena.get("winner_team") if complete and terminal else None,
         "victory_type": arena.get("victory_type") if complete and terminal else None,
         "victory_name": arena.get("victory_name") if complete and terminal else None,
@@ -99,7 +102,7 @@ def inspect_game(directory: Path) -> dict:
         "pending_decision": arena.get("pending_decision"),
         "native_failures": [line for line in runtime.get("stderr", "").splitlines()
                             if line.startswith("C6_") and any(token in line.lower() for token in (
-                                "unsupported", "refusal", "unit_failure", "choice_failed"))][-10:],
+                                "unsupported", "refusal", "unit_failure", "choice_failed", "boundary_stall"))][-10:],
         "policies": match.get("policies", {}),
         "diagnostics": {key: arena.get(key) for key in (
             "final_cities", "final_units", "founded_cities", "submitted_orders",
