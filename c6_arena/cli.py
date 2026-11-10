@@ -54,7 +54,7 @@ def main() -> int:
                               harness=args.harness,
                               rounds=args.rounds if args.rounds is not None else (1000 if args.until_victory else 10),
                               seed=args.seed,
-                              timeout=args.timeout if args.timeout is not None else (1800 if args.until_victory else 600),
+                              timeout=args.timeout if args.timeout is not None else (900 if args.until_victory else 600),
                               exploratory=args.explore,
                               until_victory=args.until_victory)
         elif args.command == "compare":

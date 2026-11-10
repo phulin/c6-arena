@@ -53,6 +53,7 @@ Lua's unseeded random functions are unavailable.
 
 | Decision kind | Option fields |
 | --- | --- |
+| `unit_selection` | Full-game mode: ready unit `name=UNIT_*`, `actor`, native type index and known coordinates; choose a unit before its command |
 | `unit` | `name` (`skip`, `fortify`, `found_city`, `move`), `actor`, `value` (operation hash), optional origin and target coordinates |
 | `production` | `name` (`UNIT_SCOUT`, `UNIT_WARRIOR`, etc.), `value` (definition index), city `x`, `y` |
 | `research`, `civic`, `commemoration` | `name` (original definition type, e.g. `TECH_WRITING`), `value` (native definition index) |
@@ -158,6 +159,8 @@ team and victory type, followed by clean native shutdown. The summary then says
 `victory_name`. It defaults to a safety budget of 1000 activation pairs, including
 interleaved Congress phases. This budget does not change the original game's
 turn limit or victory rules. Reaching the budget without a winner is a failure.
+Full-game runs use Lua per-unit scheduling to avoid repeated path queries for
+unselected units, and default to the bootstrap's 900-second execution limit.
 
 For an explicit boundary-discovery run, `run --explore --rounds 500` permits a
 longer requested horizon (up to 1000). Unsupported branches still stop and no

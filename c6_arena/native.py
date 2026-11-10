@@ -82,8 +82,8 @@ def run_game(
         raise ValueError("supported horizon is 1..100 rounds; explicit exploration allows 1..1000")
     if not 0 <= seed < 2**64:
         raise ValueError("policy seed must be an unsigned 64-bit integer")
-    if timeout <= 0:
-        raise ValueError("timeout must be positive")
+    if not 1 <= timeout <= 900:
+        raise ValueError("native bootstrap timeout must be 1..900 seconds")
     if set(policies) != {0, 1, 62, 63}:
         raise ValueError("assign Lua scripts to seats 0, 1, 62 and 63")
     harness = harness.resolve()
