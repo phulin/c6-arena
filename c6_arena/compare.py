@@ -19,7 +19,7 @@ def compare(candidate: Path, reference: Path, output: Path, *, seeds: list[int],
             adapter: str = "full", acceleration: str | None = None, city_frame: str = "native",
             query_bindings: str | None = None, yield_neighbors: str | None = None,
             city_geometry: str | None = None, amenities_index: str | None = None,
-            neighbor_geometry: str | None = None, candidate_yield_reuse: str = "native") -> dict:
+            neighbor_geometry: str | None = None, candidate_yield_reuse: str | None = None) -> dict:
     schedule = paired_schedule(seeds)
     if not 1 <= rounds <= 100 or timeout <= 0:
         raise ValueError("rounds must be 1..100 and timeout positive")

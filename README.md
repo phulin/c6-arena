@@ -40,8 +40,9 @@ Use `--harness /path/to/c6-native-arena` to select a different checkout.
 The native harness requires its compiled inputs to be committed before launch.
 The runner uses the harness's compiler cache when `ccache` is available.
 
-Full runs default to `--acceleration fast`, which reuses the harness's getter, call-binding, map and
-appeal optimizations. NPC planning, caches and turn processing remain native.
+Full runs default to `--acceleration fast`, which reuses the harness's getter,
+call-binding, map, appeal and scoped production-yield optimizations. NPC planning,
+caches and turn processing remain native.
 The appeal replacement applies within its supported citizen-query scope and
 falls back to the original calculation elsewhere. The run records its selected
 profile and native command in `match.json`; `--acceleration native` is the
@@ -243,11 +244,11 @@ fast profile, or `--yield-neighbors shadow` to compare the kernel with native
 calculations. Resolved settings are retained in each match and inspection output.
 Fast runs fuse the six current neighbor lookups within that kernel and use an
 integer-only bridge; `--neighbor-geometry native` retains the earlier lookup path.
-`--candidate-yield-reuse fast` reuses production yields within one native AI
+Fast runs reuse production yields within one native AI
 candidate evaluation when the game holds a snapshot lock and relevant trade
 routes have matching identities and retained paths. Other calls retain the
-original calculation. Use `shadow` to compare repeated native results before
-selecting `fast`.
+original calculation. Use `--candidate-yield-reuse native` for the uncached path
+or `--candidate-yield-reuse shadow` to compare repeated native results.
 
 Fast runs also use the fused city plot-coordinate kernel. It reads the current
 Game, Map and offset tables and preserves native wrapping and sentinel rules.

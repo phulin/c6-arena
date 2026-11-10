@@ -85,7 +85,7 @@ def run_game(
     query_bindings: str | None = None,
     yield_neighbors: str | None = None,
     neighbor_geometry: str | None = None,
-    candidate_yield_reuse: str = "native",
+    candidate_yield_reuse: str | None = None,
     regional_contact: bool = False,
     start_era: str | None = None,
     trace_crash: bool = False,
@@ -120,6 +120,8 @@ def run_game(
         neighbor_geometry = "fast" if acceleration == "fast" and yield_neighbors != "native" else "native"
     if neighbor_geometry not in ("native", "fast") or (neighbor_geometry != "native" and yield_neighbors == "native"):
         raise ValueError("fast neighbor_geometry requires the full neighbor yield kernel")
+    if candidate_yield_reuse is None:
+        candidate_yield_reuse = "fast" if acceleration == "fast" else "native"
     if candidate_yield_reuse not in ("native", "shadow", "fast") or (candidate_yield_reuse != "native" and adapter != "full"):
         raise ValueError("candidate_yield_reuse must be native, or shadow/fast with the full adapter")
     if not 1 <= rounds <= (1000 if exploratory or until_victory else 100):
