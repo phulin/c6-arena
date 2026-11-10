@@ -129,6 +129,12 @@ class InspectionTests(unittest.TestCase):
 
 
 class SchedulingTests(unittest.TestCase):
+    def test_only_major_seats_receive_lua_policies(self):
+        left, right = Path("left.lua"), Path("right.lua")
+        self.assertEqual(policy_assignments(left, right), {0: left, 1: right})
+        with self.assertRaisesRegex(ValueError, "NPCs use native AI"):
+            run_game({0: left, 1: right, 63: right}, Path("unused"))
+
     def test_native_cache_links_survive_output_relocation(self):
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)

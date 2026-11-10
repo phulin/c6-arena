@@ -87,8 +87,8 @@ def run_game(
         raise ValueError("policy seed must be an unsigned 64-bit integer")
     if not 1 <= timeout <= 900:
         raise ValueError("native bootstrap timeout must be 1..900 seconds")
-    if set(policies) != {0, 1, 62, 63}:
-        raise ValueError("assign Lua scripts to seats 0, 1, 62 and 63")
+    if set(policies) != {0, 1}:
+        raise ValueError("assign Lua scripts to major seats 0 and 1; NPCs use native AI")
     harness = harness.resolve()
     if not (harness / "native" / "external_policy.h").is_file():
         raise RuntimeError("native harness needs the external policy hook")
@@ -104,6 +104,7 @@ def run_game(
                if not key.startswith(("C6_ARENA_", "C6_NATIVE_"))}
         env["C6_ARENA_POLICY_LIBRARY"] = str(bridge)
         env["C6_ARENA_POLICY_TRACE"] = str(output / "decisions.jsonl")
+        env["C6_ARENA_NATIVE_NPC_AI"] = "1"
         if adapter == "full":
             env["C6_ARENA_ADAPTER"] = "full"
             env["C6_ARENA_UNIT_SELECTION"] = "per-unit"
@@ -117,9 +118,6 @@ def run_game(
             path.write_bytes(source)
             env[f"C6_ARENA_LUA_POLICY_{seat}"] = str(path)
             copied[str(seat)] = {"source": str(policies[seat].resolve()), "sha256": digest(path)}
-        # Other native NPC owners (for example city states) get their own VM
-        # running the copied NPC script, rather than falling back to built-in AI.
-        env["C6_ARENA_LUA_POLICY"] = str(output / "policies" / "seat-63.lua")
         # The bootstrap restricts its outputs to the harness's private namespace.
         # Move the finished artifacts into this run after the host has exited.
         native_output = harness / "artifacts" / f"lua-{uuid.uuid4().hex}"
@@ -130,6 +128,7 @@ def run_game(
             "--runtime", "native", "--rounds", str(rounds),
             "--policy-seed", str(seed), "--production-pool", "settlers",
             "--profile", "timing", "--timeout", str(timeout),
+            "--cpus", "1",
             "--build-cache", "ccache" if ccache_available else "off",
             "--output", str(native_output),
         ]
@@ -137,7 +136,7 @@ def run_game(
                     "exploratory": exploratory,
                     "until_victory": until_victory,
                     "adapter": adapter,
-                    "npc_default": copied["63"],
+                    "npc_control": "native",
                     "unit_selection": "per-unit" if until_victory or adapter == "full" else "pooled",
                     "policies": copied, "command": command,
                     "harness_commit": subprocess.check_output(
@@ -175,6 +174,5 @@ def run_game(
         return summary
 
 
-def policy_assignments(left: Path, right: Path, npc: Path | None = None) -> dict[int, Path]:
-    npc = npc or ROOT / "policies" / "random.lua"
-    return {0: left, 1: right, 62: npc, 63: npc}
+def policy_assignments(left: Path, right: Path) -> dict[int, Path]:
+    return {0: left, 1: right}

@@ -20,8 +20,7 @@ def compare(candidate: Path, reference: Path, output: Path, *, seeds: list[int],
     schedule = paired_schedule(seeds)
     if not 1 <= rounds <= 100 or timeout <= 0:
         raise ValueError("rounds must be 1..100 and timeout positive")
-    scripts = {"candidate": candidate.read_bytes(), "reference": reference.read_bytes(),
-               "npc": (ROOT / "policies" / "random.lua").read_bytes()}
+    scripts = {"candidate": candidate.read_bytes(), "reference": reference.read_bytes()}
     output = output.resolve()
     output.mkdir(parents=True, exist_ok=False)
     (output / "policies").mkdir()
@@ -33,7 +32,7 @@ def compare(candidate: Path, reference: Path, output: Path, *, seeds: list[int],
     for index, case in enumerate(schedule):
         left, right = ((snapshots["candidate"], snapshots["reference"]) if case["candidate_seat"] == 0
                        else (snapshots["reference"], snapshots["candidate"]))
-        game = run_game(policy_assignments(left, right, snapshots["npc"]), output / f"game-{index:03d}",
+        game = run_game(policy_assignments(left, right), output / f"game-{index:03d}",
                         harness=harness, rounds=rounds, seed=case["seed"], timeout=timeout, adapter=adapter)
         games.append({**case, "summary": game})
         report = {"schema": 1, "candidate": str(candidate.resolve()),
