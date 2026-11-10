@@ -101,6 +101,8 @@ def run_game(
                if not key.startswith(("C6_ARENA_", "C6_NATIVE_"))}
         env["C6_ARENA_POLICY_LIBRARY"] = str(bridge)
         env["C6_ARENA_POLICY_TRACE"] = str(output / "decisions.jsonl")
+        if until_victory:
+            env["C6_ARENA_REQUIRE_VICTORY"] = "1"
         copied = {}
         for seat, source in scripts.items():
             path = output / "policies" / f"seat-{seat}.lua"
