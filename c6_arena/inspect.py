@@ -77,6 +77,13 @@ def inspect_game(directory: Path) -> dict:
         "winner": None, "checks": checks, "errors": errors,
         "rounds": rounds, "seed": match.get("seed"),
         "exploratory": match.get("exploratory", False),
+        "native_status": arena.get("status"), "native_phase": arena.get("phase"),
+        "completed_half_turns": arena.get("completed_half_turns"),
+        "initial_turn": arena.get("initial_turn"), "final_turn": arena.get("final_turn"),
+        "pending_decision": arena.get("pending_decision"),
+        "native_failures": [line for line in runtime.get("stderr", "").splitlines()
+                            if line.startswith("C6_") and any(token in line.lower() for token in (
+                                "unsupported", "refusal", "unit_failure", "choice_failed"))][-10:],
         "policies": match.get("policies", {}),
         "diagnostics": {key: arena.get(key) for key in (
             "final_cities", "final_units", "founded_cities", "submitted_orders",

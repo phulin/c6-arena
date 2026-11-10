@@ -64,8 +64,8 @@ local function situation(ctx)
         if not strongest or (city.production or 0) > (strongest.production or 0) then strongest = city end
     end
     for _, unit in ipairs(o.units or {}) do if unit.id then units[unit.id] = unit end end
-    local city_count = p.city_count or #(o.cities or {})
-    if city_count == 0 then city_count = memory.founded end
+    local city_count = p.city_count
+    if city_count == nil then city_count = o.cities and #o.cities or memory.founded end
     local threat = p.threat or 0
     if p.enemy_strength and p.military_strength then
         threat = math.max(threat, clamp(p.enemy_strength / math.max(1, p.military_strength) - 0.5, 0, 2))

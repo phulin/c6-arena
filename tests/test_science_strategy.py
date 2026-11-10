@@ -150,6 +150,13 @@ class ScienceStrategyTests(unittest.TestCase):
         choice = self.choose("unit", options=options, random_index=4096)
         self.assertEqual(choice["selected"], 4096)
 
+    def test_current_observations_override_old_founding_memory(self):
+        self.choose("unit", ["found_city"])
+        choice = self.choose("unit", options=[
+            {"name": "found_city", "threat": 1}, {"name": "move", "goody_hut": True}],
+            observation={"player": {"city_count": 0}})
+        self.assertEqual(choice["option"]["name"], "found_city")
+
 
 class ContextTests(unittest.TestCase):
     def test_nested_data_booleans_unicode_and_optional_values(self):

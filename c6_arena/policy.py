@@ -107,6 +107,8 @@ class LuaPolicy:
     def choose(self, context: dict) -> dict:
         if self.lib is None:
             raise RuntimeError("use LuaPolicy as a context manager")
+        if not isinstance(context, dict):
+            raise ValueError("each decision context must be an object")
         owner = context.get("owner", 0)
         options = context.get("options", [])
         if type(owner) is not int or not 0 <= owner < 64 or not options or len(options) > 4096:

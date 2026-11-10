@@ -51,6 +51,14 @@ class InspectionTests(unittest.TestCase):
         self.assertEqual(result["outcome"], "coverage_failure")
         self.assertIsNone(result["winner"])
 
+    def test_native_stop_details_survive_in_inspection(self):
+        runtime = json.loads((self.path / "native/runtime.json").read_text())
+        runtime["stderr"] = "C6_ARENA unit_progress_refusal reason=actor_busy\n"
+        write_json(self.path / "native/runtime.json", runtime)
+        result = inspect_game(self.path)
+        self.assertIn("actor_busy", result["native_failures"][0])
+        self.assertEqual(result["final_turn"], 2)
+
     def test_missing_and_broken_trace(self):
         (self.path / "decisions.jsonl").unlink()
         self.assertFalse(inspect_game(self.path)["checks"]["lua_trace"])
