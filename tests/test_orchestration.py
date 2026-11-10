@@ -135,6 +135,36 @@ class SchedulingTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "NPCs use native AI"):
             run_game({0: left, 1: right, 63: right}, Path("unused"))
 
+    def test_inherited_npc_policy_settings_cannot_override_native_control(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            harness = root / "harness"
+            (harness / "native").mkdir(parents=True)
+            (harness / "native/external_policy.h").touch()
+            script, bridge = root / "strategy.lua", root / "bridge.so"
+            script.write_text("return function(ctx) return 1 end")
+            bridge.write_bytes(b"test bridge")
+            inherited = {"C6_ARENA_LUA_POLICY_62": "city-state.lua",
+                         "C6_ARENA_LUA_POLICY_63": "barbarian.lua",
+                         "C6_ARENA_NATIVE_NPC_AI": "0",
+                         "C6_NATIVE_CONTROLLER": "external"}
+            for adapter in ("full", "limited"):
+                with self.subTest(adapter=adapter), patch.dict("os.environ", inherited), patch(
+                        "c6_arena.native.runner_lock", return_value=nullcontext()), patch(
+                        "c6_arena.native.build_bridge", return_value=bridge), patch(
+                        "c6_arena.native.subprocess.check_output", return_value="commit\n"), patch(
+                        "c6_arena.native.subprocess.Popen") as launch, patch(
+                        "c6_arena.inspect.inspect_game", return_value={"outcome": "truncated"}):
+                    launch.return_value.wait.return_value = 0
+                    output = root / adapter
+                    run_game({0: script, 1: script}, output, harness=harness, adapter=adapter)
+                    env = launch.call_args.kwargs["env"]
+                    self.assertEqual(env["C6_ARENA_NATIVE_NPC_AI"], "1")
+                    self.assertNotIn("C6_ARENA_LUA_POLICY_62", env)
+                    self.assertNotIn("C6_ARENA_LUA_POLICY_63", env)
+                    self.assertNotIn("C6_NATIVE_CONTROLLER", env)
+                    self.assertEqual(json.loads((output / "match.json").read_text())["npc_control"], "native")
+
     def test_native_cache_links_survive_output_relocation(self):
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
