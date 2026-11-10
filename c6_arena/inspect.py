@@ -12,6 +12,7 @@ def read_json(path: Path) -> dict:
 
 def iter_decisions(path: Path, errors: list[str]):
     """Stream large game traces without retaining every legal-option list."""
+    worlds = {}
     if path.exists():
         with path.open() as stream:
             for line_number, line in enumerate(stream, 1):
@@ -19,6 +20,30 @@ def iter_decisions(path: Path, errors: list[str]):
                     row = json.loads(line)
                 except json.JSONDecodeError:
                     errors.append(f"incomplete or malformed trace line {line_number}")
+                    continue
+                if isinstance(row, dict) and row.get("record") in ("world", "observation"):
+                    owner, revision = row.get("owner"), row.get("observation_id")
+                    if type(owner) is not int or not 0 <= owner < 64 or type(revision) is not int or revision < 0:
+                        errors.append(f"invalid observation identity at trace line {line_number}")
+                        continue
+                    if row["record"] == "world":
+                        fields = row.get("fields")
+                        if not isinstance(fields, list) or not all(isinstance(field, str) for field in fields):
+                            errors.append(f"invalid observation fields at trace line {line_number}")
+                            continue
+                        worlds[owner] = {"revision": revision, "fields": fields, "queries": {}, "values": {}}
+                    else:
+                        world = worlds.get(owner)
+                        if not world or world["revision"] != revision or not isinstance(row.get("query"), str) or any(
+                                type(row.get(arg)) is not int for arg in ("a", "b")) or "value" not in row:
+                            errors.append(f"observation query without matching world at trace line {line_number}")
+                            continue
+                        key = (row["query"], row["a"], row["b"])
+                        if key in world["queries"]:
+                            errors.append(f"duplicate observation query at trace line {line_number}")
+                        world["queries"][key] = {key: row[key] for key in ("query", "a", "b", "value")}
+                        if row["a"] == -(2**31) and row["b"] == -(2**31) and row["query"] in world["fields"]:
+                            world["values"][row["query"]] = row["value"]
                     continue
                 if not isinstance(row, dict) or not all(
                         key in row for key in ("sequence", "owner", "kind")):
@@ -30,6 +55,14 @@ def iter_decisions(path: Path, errors: list[str]):
                 if "options" not in row:
                     errors.append(f"missing options at trace line {line_number}")
                     continue
+                if "observation_id" in row:
+                    world = worlds.get(row["owner"])
+                    if not world or world["revision"] != row["observation_id"]:
+                        errors.append(f"decision without matching observation at trace line {line_number}")
+                        continue
+                    row = {**row, "observation": dict(world["values"]),
+                           "observation_fields": world["fields"],
+                           "observation_queries": list(world["queries"].values())}
                 yield row
 
 

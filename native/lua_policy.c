@@ -17,9 +17,14 @@
 #define HOOK_INTERVAL 1000
 #define HOOK_TICKS 1000
 struct policy_timing {
-    uint64_t calls, loads, failures, load_ns, marshal_ns, lua_ns, trace_ns, bridge_ns;
+    uint64_t calls, loads, failures, load_ns, marshal_ns, lua_ns, trace_ns, bridge_ns, query_ns, queries;
 };
-struct policy { lua_State *vm; size_t bytes; int ref, ticks; struct policy_timing timing; };
+struct policy {
+    lua_State *vm; size_t bytes; int ref, ticks;
+    int observation_ref, world_ref;
+    uint64_t revision;
+    struct policy_timing timing;
+};
 static struct policy policies[64];
 static struct policy *active;
 static const struct c6_policy_request_v1 *request;
@@ -27,6 +32,7 @@ static unsigned long sequence;
 static FILE *trace;
 static FILE *timing_trace;
 static const struct c6_value_v1 *context;
+static const struct c6_observation_source_v2 *observation_source;
 static char last_reason[512];
 static unsigned context_nodes;
 static int timing_enabled;
@@ -41,8 +47,9 @@ const char *c6_arena_policy_timing_json_v1(int32_t owner) {
     const struct policy_timing *t=&policies[owner].timing;
     snprintf(json,sizeof json,"{\"owner\":%d,\"calls\":%" PRIu64 ",\"loads\":%" PRIu64
         ",\"failures\":%" PRIu64 ",\"load_cpu_ns\":%" PRIu64 ",\"marshal_cpu_ns\":%" PRIu64
-        ",\"lua_cpu_ns\":%" PRIu64 ",\"trace_cpu_ns\":%" PRIu64 ",\"bridge_cpu_ns\":%" PRIu64 "}",
-        owner,t->calls,t->loads,t->failures,t->load_ns,t->marshal_ns,t->lua_ns,t->trace_ns,t->bridge_ns);
+        ",\"lua_cpu_ns\":%" PRIu64 ",\"trace_cpu_ns\":%" PRIu64 ",\"bridge_cpu_ns\":%" PRIu64
+        ",\"query_cpu_ns\":%" PRIu64 ",\"queries\":%" PRIu64 "}",
+        owner,t->calls,t->loads,t->failures,t->load_ns,t->marshal_ns,t->lua_ns,t->trace_ns,t->bridge_ns,t->query_ns,t->queries);
     return json;
 }
 
@@ -65,6 +72,8 @@ static void string_field(lua_State *vm,const char *key,const char *value) {
 static void integer_field(lua_State *vm,const char *key,ptrdiff_t value) {
     lua_pushinteger(vm,value);lua_setfield(vm,-2,key);
 }
+static int lazy_next(lua_State *vm);
+static int lazy_pairs(lua_State *vm);
 static int initialize_libraries(lua_State *vm) {
     const struct {lua_CFunction open;const char *name;} libs[]={
         {luaopen_base,""},{luaopen_table,"table"},
@@ -82,6 +91,8 @@ static int initialize_libraries(lua_State *vm) {
     lua_getfield(vm,LUA_GLOBALSINDEX,"math");
     lua_pushnil(vm);lua_setfield(vm,-2,"random");
     lua_pushnil(vm);lua_setfield(vm,-2,"randomseed");
+    lua_pushcclosure(vm,lazy_pairs,0);lua_setfield(vm,LUA_GLOBALSINDEX,"pairs");
+    lua_pushcclosure(vm,lazy_next,0);lua_setfield(vm,LUA_GLOBALSINDEX,"next");
     lua_settop(vm,0);return 0;
 }
 static void json_string(FILE *out,const char *s) {
@@ -121,6 +132,7 @@ static void log_choice_impl(uint32_t selected,const char *error) {
             if(!strcmp(field->key,"owner")||!strcmp(field->key,"kind"))continue;
             fputc(',',trace);json_string(trace,field->key);fputc(':',trace);json_value(trace,field);
         }
+        if(observation_source)fprintf(trace,",\"observation_id\":%" PRIu64,observation_source->revision);
         fputs(",\"selected\":",trace);
         if(error)fputs("null",trace);else fprintf(trace,"%u",selected+1);
         fputs(",\"error\":",trace);
@@ -201,11 +213,152 @@ static void push_value(lua_State *vm,const struct c6_value_v1 *v,unsigned depth)
         else lua_setfield(vm,-2,v->children[i].key);
     }
 }
+#define UPVALUE(I) (LUA_GLOBALSINDEX-(I))
+static void trace_world(int owner,uint64_t revision) {
+    if(!trace)return;
+    uint64_t start=cpu_ns();
+    fprintf(trace,"{\"record\":\"world\",\"owner\":%d,\"observation_id\":%" PRIu64 ",\"fields\":[",owner,revision);
+    for(unsigned i=0;i<observation_source->field_count;++i){
+        if(i)fputc(',',trace);
+        json_string(trace,observation_source->fields[i]);
+    }
+    fputs("]}\n",trace);fflush(trace);active->timing.trace_ns+=cpu_ns()-start;
+}
+static void query_result(lua_State *vm,int owner,uint64_t revision,const char *kind,int32_t a,int32_t b) {
+    char key[256];int length=snprintf(key,sizeof key,"%s:%d:%d",kind,a,b);
+    if(length<0||(size_t)length>=sizeof key)luaL_error(vm,"query name too long");
+    lua_pushstring(vm,key);lua_rawget(vm,UPVALUE(3));
+    if(lua_type(vm,-1)==LUA_TTABLE){
+        lua_getfield(vm,-1,"value");lua_remove(vm,-2);return;
+    }
+    lua_settop(vm,-2);
+    if(!observation_source||!request||request->owner!=owner||observation_source->revision!=revision)
+        luaL_error(vm,"observation revision expired; retain fetched values instead");
+    const struct c6_value_v1 *value=NULL;
+    uint64_t start=cpu_ns();
+    int status=observation_source->query(observation_source->opaque,owner,kind,a,b,&value);
+    active->timing.query_ns+=cpu_ns()-start;++active->timing.queries;
+    const struct c6_value_v1 missing={.type=C6_NULL};
+    if(status==1)value=&missing;
+    else if(status||!value)luaL_error(vm,"native observation query failed: %s (%d)",kind,status);
+    start=cpu_ns();push_value(vm,value,0);active->timing.marshal_ns+=cpu_ns()-start;
+    int result=lua_gettop(vm);
+    if(trace){
+        start=cpu_ns();
+        fprintf(trace,"{\"record\":\"observation\",\"owner\":%d,\"observation_id\":%" PRIu64 ",\"query\":",owner,revision);
+        json_string(trace,kind);fprintf(trace,",\"a\":%d,\"b\":%d,\"value\":",a,b);json_value(trace,value);
+        fputs("}\n",trace);fflush(trace);active->timing.trace_ns+=cpu_ns()-start;
+    }
+    lua_pushstring(vm,key);lua_createtable(vm,0,1);
+    lua_pushvalue(vm,result);lua_setfield(vm,-2,"value");lua_rawset(vm,UPVALUE(3));
+}
+static int observation_index(lua_State *vm) {
+    if(lua_type(vm,2)!=LUA_TSTRING){lua_pushnil(vm);return 1;}
+    lua_pushvalue(vm,2);lua_rawget(vm,UPVALUE(4));
+    int known=lua_type(vm,-1)!=LUA_TNIL;lua_settop(vm,-2);
+    if(!known){lua_pushnil(vm);return 1;}
+    const char *kind=lua_tolstring(vm,2,NULL);
+    query_result(vm,(int)lua_tonumber(vm,UPVALUE(1)),(uint64_t)lua_tonumber(vm,UPVALUE(2)),kind,INT32_MIN,INT32_MIN);
+    lua_pushvalue(vm,2);lua_pushvalue(vm,-2);lua_rawset(vm,1);return 1;
+}
+static int load_all_observations(lua_State *vm) {
+    size_t n=lua_objlen(vm,UPVALUE(1));
+    for(size_t i=1;i<=n;++i){
+        lua_rawgeti(vm,UPVALUE(1),(int)i);
+        const char *key=lua_tolstring(vm,-1,NULL);
+        lua_getfield(vm,1,key);lua_settop(vm,-3);
+    }
+    return 0;
+}
+static void materialize_if_lazy(lua_State *vm) {
+    int top=lua_gettop(vm);
+    if(lua_getmetatable(vm,1)){
+        lua_getfield(vm,-1,"__c6_load_all");
+        if(lua_type(vm,-1)==LUA_TFUNCTION){lua_pushvalue(vm,1);lua_call(vm,1,0);}
+    }
+    lua_settop(vm,top);
+}
+static int lazy_next(lua_State *vm) {
+    materialize_if_lazy(vm);lua_settop(vm,2);
+    if(lua_next(vm,1))return 2;
+    lua_pushnil(vm);return 1;
+}
+static int lazy_pairs(lua_State *vm) {
+    materialize_if_lazy(vm);
+    lua_pushcclosure(vm,lazy_next,0);lua_pushvalue(vm,1);lua_pushnil(vm);return 3;
+}
+static int32_t query_integer(lua_State *vm,int index) {
+    double value=lua_tonumber(vm,index);
+    if(lua_type(vm,index)!=LUA_TNUMBER||!isfinite(value)||value<INT32_MIN||value>INT32_MAX||value!=(int32_t)value)
+        luaL_error(vm,"world query argument must be a 32-bit integer");
+    return (int32_t)value;
+}
+static int world_query(lua_State *vm) {
+    int owner=(int)lua_tonumber(vm,UPVALUE(1));
+    uint64_t revision=(uint64_t)lua_tonumber(vm,UPVALUE(2));
+    const char *kind=lua_tolstring(vm,UPVALUE(4),NULL);
+    int first=lua_type(vm,1)==LUA_TTABLE?2:1;
+    int32_t a=INT32_MIN,b=INT32_MIN;
+    if(!strcmp(kind,"plot")||!strcmp(kind,"plot_yields")){
+        a=query_integer(vm,first);b=query_integer(vm,first+1);
+    }else if(!strcmp(kind,"city")||!strcmp(kind,"unit")){
+        a=query_integer(vm,first);
+        b=lua_gettop(vm)>=first+1?query_integer(vm,first+1):owner;
+    }
+    query_result(vm,owner,revision,kind,a,b);return 1;
+}
+static void query_upvalues(lua_State *vm,int owner,uint64_t revision,int cache) {
+    lua_pushinteger(vm,owner);lua_pushnumber(vm,(double)revision);lua_pushvalue(vm,cache);
+}
+static void attach_observations(lua_State *vm) {
+    int top=lua_gettop(vm),owner=request->owner;
+    uint64_t revision=observation_source->revision;
+    if(!active->observation_ref||active->revision!=revision){
+        if(active->observation_ref)luaL_unref(vm,LUA_REGISTRYINDEX,active->observation_ref);
+        if(active->world_ref)luaL_unref(vm,LUA_REGISTRYINDEX,active->world_ref);
+        lua_createtable(vm,(int)observation_source->field_count,(int)observation_source->field_count);
+        int fields=lua_gettop(vm);
+        for(unsigned i=0;i<observation_source->field_count;++i){
+            const char *name=observation_source->fields[i];
+            lua_pushstring(vm,name);lua_rawseti(vm,fields,(int)i+1);
+            lua_pushboolean(vm,1);lua_setfield(vm,fields,name);
+        }
+        lua_createtable(vm,0,16);int cache=lua_gettop(vm);
+        lua_createtable(vm,0,(int)observation_source->field_count);int observation=lua_gettop(vm);
+        lua_createtable(vm,0,3);
+        query_upvalues(vm,owner,revision,cache);lua_pushvalue(vm,fields);
+        lua_pushcclosure(vm,observation_index,4);lua_setfield(vm,-2,"__index");
+        lua_pushvalue(vm,fields);lua_pushcclosure(vm,load_all_observations,1);lua_setfield(vm,-2,"__c6_load_all");
+        lua_pushstring(vm,"observation");lua_setfield(vm,-2,"__metatable");
+        lua_setmetatable(vm,observation);
+        lua_pushvalue(vm,observation);active->observation_ref=luaL_ref(vm,LUA_REGISTRYINDEX);
+        lua_createtable(vm,0,(int)observation_source->field_count+6);int world=lua_gettop(vm);
+        for(unsigned i=0;i<observation_source->field_count;++i){
+            const char *name=observation_source->fields[i];
+            query_upvalues(vm,owner,revision,cache);lua_pushstring(vm,name);
+            lua_pushcclosure(vm,world_query,4);lua_setfield(vm,world,name);
+        }
+        static const char *const methods[]={"plot","plot_yields","plots_basic","city","unit"};
+        for(unsigned i=0;i<sizeof methods/sizeof *methods;++i){
+            query_upvalues(vm,owner,revision,cache);lua_pushstring(vm,methods[i]);
+            lua_pushcclosure(vm,world_query,4);lua_setfield(vm,world,methods[i]);
+        }
+        lua_pushnumber(vm,(double)revision);lua_setfield(vm,world,"revision");
+        lua_pushvalue(vm,world);active->world_ref=luaL_ref(vm,LUA_REGISTRYINDEX);
+        active->revision=revision;lua_settop(vm,top);trace_world(owner,revision);
+    }
+    lua_rawgeti(vm,LUA_REGISTRYINDEX,active->observation_ref);lua_setfield(vm,top,"observation");
+    lua_rawgeti(vm,LUA_REGISTRYINDEX,active->world_ref);lua_setfield(vm,top,"world");
+    lua_pushnumber(vm,(double)revision);lua_setfield(vm,top,"observation_id");
+}
 static int call_policy(lua_State *vm) {
     uint64_t start=cpu_ns();
     lua_rawgeti(vm,LUA_REGISTRYINDEX,active->ref);
     if(context){
-        push_value(vm,context,0);active->timing.marshal_ns+=cpu_ns()-start;
+        uint64_t trace_before=active->timing.trace_ns;
+        push_value(vm,context,0);
+        if(observation_source)attach_observations(vm);
+        active->timing.marshal_ns+=cpu_ns()-start-(active->timing.trace_ns-trace_before);
         lua_call(vm,1,2);return 2;
     }
     lua_createtable(vm,0,4);
@@ -231,7 +384,7 @@ int c6_arena_policy_reset_v1(void) {
         if(policies[i].vm)lua_close(policies[i].vm);
         policies[i]=(struct policy){0};
     }
-    active=NULL;request=NULL;sequence=0;context=NULL;last_reason[0]=0;
+    active=NULL;request=NULL;sequence=0;context=NULL;observation_source=NULL;last_reason[0]=0;
     if(trace){fclose(trace);trace=NULL;}
     if(timing_trace){fclose(timing_trace);timing_trace=NULL;}
     return 0;
@@ -253,10 +406,12 @@ static int execute_choice_impl(const struct c6_policy_request_v1 *r,uint32_t *se
     }
     lua_State *vm=active->vm;lua_settop(vm,0);active->ticks=HOOK_TICKS;
     lua_pushcclosure(vm,call_policy,0);
-    uint64_t start=cpu_ns(),marshal_before=active->timing.marshal_ns;
+    uint64_t start=cpu_ns(),marshal_before=active->timing.marshal_ns,
+        query_before=active->timing.query_ns,trace_before=active->timing.trace_ns;
     int status=lua_pcall(vm,0,2,0);
-    uint64_t elapsed=cpu_ns()-start,marshalled=active->timing.marshal_ns-marshal_before;
-    active->timing.lua_ns+=elapsed>=marshalled?elapsed-marshalled:0;
+    uint64_t elapsed=cpu_ns()-start,other=(active->timing.marshal_ns-marshal_before)
+        +(active->timing.query_ns-query_before)+(active->timing.trace_ns-trace_before);
+    active->timing.lua_ns+=elapsed>=other?elapsed-other:0;
     if(status)return fail(vm,"choice failed");
     double index=lua_tonumber(vm,-2);
     if(lua_type(vm,-2)!=LUA_TNUMBER||!(index>=1&&index<=r->count)||index!=(uint32_t)index)
@@ -284,10 +439,11 @@ static int execute_choice(const struct c6_policy_request_v1 *r,uint32_t *selecte
     return status;
 }
 int c6_arena_choose_v1(const struct c6_policy_request_v1 *r,uint32_t *selected) {
-    context=NULL;return execute_choice(r,selected);
+    context=NULL;observation_source=NULL;return execute_choice(r,selected);
 }
 const char *c6_arena_last_reason_v1(void) {return last_reason;}
-int c6_arena_choose_context_v1(int32_t owner,const struct c6_value_v1 *v,uint32_t *selected) {
+static int choose_context(int32_t owner,const struct c6_value_v1 *v,
+                          const struct c6_observation_source_v2 *source,uint32_t *selected) {
     if(!v||v->type!=C6_OBJECT||v->count>64||!v->children)return 197;
     const struct c6_value_v1 *kind=NULL,*options=NULL,*random=NULL,*seat=NULL;
     for(unsigned i=0;i<v->count;++i){
@@ -304,5 +460,16 @@ int c6_arena_choose_context_v1(int32_t owner,const struct c6_value_v1 *v,uint32_
        !seat||seat->type!=C6_NUMBER||seat->number!=owner)return 197;
     struct c6_policy_request_v1 r={.abi_version=1,.kind=kind->text,.owner=owner,
         .count=options->count,.random_index=(uint32_t)random->number-1};
-    context=v;int status=execute_choice(&r,selected);context=NULL;return status;
+    context=v;observation_source=source;
+    int status=execute_choice(&r,selected);context=NULL;observation_source=NULL;return status;
+}
+int c6_arena_choose_context_v1(int32_t owner,const struct c6_value_v1 *v,uint32_t *selected) {
+    return choose_context(owner,v,NULL,selected);
+}
+int c6_arena_choose_context_v2(int32_t owner,const struct c6_value_v1 *v,
+                             const struct c6_observation_source_v2 *source,uint32_t *selected) {
+    if(!source||source->abi_version!=2||!source->query||source->field_count>64||
+       (source->field_count&&!source->fields)||source->revision>UINT64_C(9007199254740991))return 197;
+    for(unsigned i=0;i<source->field_count;++i)if(!source->fields[i])return 197;
+    return choose_context(owner,v,source,selected);
 }

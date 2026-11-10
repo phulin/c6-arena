@@ -94,6 +94,18 @@ operation. Hooks reserve human-major choices for Lua and retain built-in NPC AI.
 Full mode supplies `ctx.observation` and descriptive `option.metadata`, including
 purchase costs, Great Person classes, promotion/improvement names, government
 comparison/anarchy, Congress targets, and deal amount ranges.
+The current bridge fetches observation fields when Lua first reads them and
+retains their Lua tables for that seat and world revision. Menu navigation
+shares a revision; actions, engine updates and uncertain transitions invalidate
+it. Fetched tables can be retained as past data. Reading an unfetched field from
+an older revision raises an error.
+
+For targeted queries, use `ctx.world:city(id[, owner])`, `:unit(id[, owner])`,
+`:plot(x, y)`, or `:plot_yields(x, y)`. `:plots_basic()` returns revealed plot
+records without yield calculations. Repeated queries share cached results in
+the same revision. The compatibility field `ctx.observation.plots` still
+requests the complete plot view; iterating all of `ctx.observation` with
+`pairs` or `next` explicitly fetches every field.
 The Lua bridge receives copied scalar choices, never raw engine pointers. The
 stable ABI is `native/policy_api.h`, mirrored by the harness's
 `native/external_policy.h` (native indices are zero based). Without a plugin,
@@ -168,12 +180,17 @@ outputs, and `decisions.jsonl`. The trace records each offered choice and the
 selection. `inspect` summarizes decisions by seat and highlights cases where
 FoundCity was available but delayed. Those are prompts for inspection, not
 automatic declarations of mistakes.
+Demand-driven traces store a world declaration and each fetched query result
+once, followed by decisions referencing that revision. `inspect`, `reflect`
+and replay resolve those references. Replay reports an error if a changed
+script requests data that the original run never fetched.
 
 `policy-timing.jsonl` records cumulative CPU timings per seat while the game
 runs: script/VM loading, Lua table construction, protected Lua execution, trace
-writing, and the complete bridge call. Loading happens once per seat; the returned
+writing, native demand-query execution, and the complete bridge call. Loading happens once per seat; the returned
 Lua function runs for each decision. These counters exclude native observation
-construction, which is included in the harness's broader policy timing.
+construction for the legacy v1 interface. V2 records demand-query CPU separately
+within the bridge call; the harness's broader policy timing includes both paths.
 
 `reflect` produces a compact JSON packet containing the script and summary for
 an LLM to edit. Read the referenced trace for more context, save a modified

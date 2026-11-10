@@ -21,6 +21,19 @@ class Value(ct.Structure):
 
 Value._fields_ = [("key", ct.c_char_p), ("type", ct.c_uint32), ("number", ct.c_double),
                   ("text", ct.c_char_p), ("count", ct.c_uint32), ("children", ct.POINTER(Value))]
+QueryFunction = ct.CFUNCTYPE(ct.c_int, ct.c_void_p, ct.c_int32, ct.c_char_p,
+                            ct.c_int32, ct.c_int32, ct.POINTER(ct.POINTER(Value)))
+
+
+class ObservationSource(ct.Structure):
+    _fields_ = [("abi_version", ct.c_uint32), ("field_count", ct.c_uint32),
+                ("revision", ct.c_uint64), ("fields", ct.POINTER(ct.c_char_p)),
+                ("opaque", ct.c_void_p), ("query", QueryFunction)]
+
+
+OBSERVATION_FIELDS = ("turn", "player", "known_technologies", "known_civics", "cities", "units",
+                      "plots", "victory_progress", "players", "visible_units", "visible_cities")
+NO_QUERY_ARGUMENT = -(2**31)
 _runtime_lock = threading.Lock()
 
 
@@ -79,8 +92,9 @@ def environment(updates):
 class LuaPolicy:
     """One synchronous policy session per Python interpreter; per-seat Lua memory."""
 
-    def __init__(self, script: Path):
+    def __init__(self, script: Path, *, trace: Path | None = None):
         self.script = script.resolve()
+        self.trace = trace.resolve() if trace is not None else None
         self.lib = None
 
     def __enter__(self):
@@ -92,6 +106,9 @@ class LuaPolicy:
             self.lib = ct.CDLL(str(build_bridge()))
             self.lib.c6_arena_choose_context_v1.argtypes = [ct.c_int32, ct.POINTER(Value), ct.POINTER(ct.c_uint32)]
             self.lib.c6_arena_choose_context_v1.restype = ct.c_int
+            self.lib.c6_arena_choose_context_v2.argtypes = [ct.c_int32, ct.POINTER(Value),
+                ct.POINTER(ObservationSource), ct.POINTER(ct.c_uint32)]
+            self.lib.c6_arena_choose_context_v2.restype = ct.c_int
             self.lib.c6_arena_last_reason_v1.restype = ct.c_char_p
             self.lib.c6_arena_policy_reset_v1()
             return self
@@ -121,14 +138,50 @@ class LuaPolicy:
         if type(random) is not int or not 1 <= random <= len(options):
             raise ValueError("random_index must be a one-based option index")
         request = {**context, "owner": owner, "random_index": random}
+        source = None
+        query_errors = []
+        if "observation_id" in context:
+            revision = context["observation_id"]
+            if type(revision) is not int or not 0 <= revision <= 2**53-1:
+                raise ValueError("observation_id must be an exact nonnegative integer")
+            fields = context.get("observation_fields", OBSERVATION_FIELDS)
+            if not all(isinstance(field, str) and "\0" not in field for field in fields):
+                raise ValueError("observation field names must be strings without NUL bytes")
+            field_names = (ct.c_char_p * len(fields))(*(name.encode() for name in fields))
+            queries = {(name, NO_QUERY_ARGUMENT, NO_QUERY_ARGUMENT): value
+                       for name, value in context.get("observation", {}).items()}
+            for query in context.get("observation_queries", []):
+                queries[(query["query"], query["a"], query["b"])] = query["value"]
+            query_values = []
+
+            @QueryFunction
+            def fetch(_opaque, seat, name, a, b, out):
+                key = (name.decode(), a, b)
+                if seat != owner or key not in queries:
+                    query_errors.append(f"observation query was not recorded: {key}")
+                    return 299
+                try:
+                    tree = encode(queries[key], keep=query_values)
+                    query_values.append(tree)
+                    out[0] = ct.pointer(tree)
+                    return 0
+                except (ValueError, TypeError) as error:
+                    query_errors.append(str(error))
+                    return 299
+
+            source = ObservationSource(2, len(fields), revision, field_names, None, fetch)
+            request = {key: request[key] for key in ("kind", "owner", "options", "random_index")}
         keep = []
         tree = encode(request, keep=keep)
         selected = ct.c_uint32(2**32-1)
         with environment({f"C6_ARENA_LUA_POLICY_{owner}": str(self.script),
-                          "C6_ARENA_POLICY_TRACE": None}):
-            status = self.lib.c6_arena_choose_context_v1(owner, ct.byref(tree), ct.byref(selected))
+                          "C6_ARENA_POLICY_TRACE": str(self.trace) if self.trace is not None else None}):
+            if source is None:
+                status = self.lib.c6_arena_choose_context_v1(owner, ct.byref(tree), ct.byref(selected))
+            else:
+                status = self.lib.c6_arena_choose_context_v2(owner, ct.byref(tree), ct.byref(source), ct.byref(selected))
         if status:
-            raise RuntimeError(f"Lua policy failed with status {status}")
+            raise RuntimeError(query_errors[-1] if query_errors else f"Lua policy failed with status {status}")
         return {"selected": selected.value+1, "option": options[selected.value],
                 "reason": self.lib.c6_arena_last_reason_v1().decode()}
 
