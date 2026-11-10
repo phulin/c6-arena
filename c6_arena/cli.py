@@ -25,6 +25,8 @@ def parser() -> argparse.ArgumentParser:
         command.add_argument("--adapter", choices=("full", "limited"), default="full")
         command.add_argument("--acceleration", choices=("native", "fast"),
                              help="default fast with full adapter; native for reference runs")
+        command.add_argument("--query-bindings", choices=("live", "owned"), default="live",
+                             help="owned reuses admitted stock providers; requires fast acceleration")
         command.add_argument("--city-frame", choices=("native", "shadow", "fast"), default="native",
                              help="city economic kernel; shadow checks native results")
         command.add_argument("--rounds", type=int, default=None if name == "run" else 10)
@@ -65,13 +67,13 @@ def main() -> int:
                               timeout=args.timeout if args.timeout is not None else (1800 if args.until_victory else 600),
                               exploratory=args.explore,
                               until_victory=args.until_victory, adapter=args.adapter,
-                              acceleration=args.acceleration, city_frame=args.city_frame,
+                              acceleration=args.acceleration, city_frame=args.city_frame, query_bindings=args.query_bindings,
                               regional_contact=args.regional_contact, start_era=args.start_era,
                               trace_crash=args.trace_crash)
         elif args.command == "compare":
             result = compare(args.candidate, args.reference, args.output, seeds=args.seeds,
                              harness=args.harness, rounds=args.rounds, timeout=args.timeout,
-                             adapter=args.adapter, acceleration=args.acceleration, city_frame=args.city_frame)
+                             adapter=args.adapter, acceleration=args.acceleration, city_frame=args.city_frame, query_bindings=args.query_bindings)
         elif args.command == "schedule":
             result = paired_schedule(args.seeds)
         elif args.command == "replay":

@@ -172,6 +172,8 @@ class SchedulingTests(unittest.TestCase):
             inherited = {"C6_ARENA_LUA_POLICY_62": "city-state.lua",
                          "C6_ARENA_LUA_POLICY_63": "barbarian.lua",
                          "C6_ARENA_NATIVE_NPC_AI": "0",
+                         "C6_ARENA_ENTRY_BINDINGS": "untrusted",
+                         "C6_ARENA_OWNER_PREDICATE": "untrusted",
                          "C6_NATIVE_CONTROLLER": "external"}
             for adapter, acceleration in (("full", "native"), ("full", "fast"), ("limited", "native"),
                                           ("full", None), ("limited", None)):
@@ -183,13 +185,16 @@ class SchedulingTests(unittest.TestCase):
                         "c6_arena.inspect.inspect_game", return_value={"outcome": "truncated"}):
                     launch.return_value.wait.return_value = 0
                     output = root / f"{adapter}-{acceleration}"
+                    owned = acceleration == "fast"
                     run_game({0: script, 1: script}, output, harness=harness, adapter=adapter,
-                             acceleration=acceleration, city_frame="shadow" if adapter == "full" else "native")
+                             acceleration=acceleration, query_bindings="owned" if owned else "live", city_frame="shadow" if adapter == "full" else "native")
                     env = launch.call_args.kwargs["env"]
                     self.assertEqual(env["C6_ARENA_NATIVE_NPC_AI"], "1")
                     self.assertNotIn("C6_ARENA_LUA_POLICY_62", env)
                     self.assertNotIn("C6_ARENA_LUA_POLICY_63", env)
                     self.assertNotIn("C6_NATIVE_CONTROLLER", env)
+                    self.assertEqual(env.get("C6_ARENA_ENTRY_BINDINGS"), "owned" if owned else None)
+                    self.assertEqual(env.get("C6_ARENA_OWNER_PREDICATE"), "inline" if owned else None)
                     self.assertEqual(json.loads((output / "match.json").read_text())["npc_control"], "native")
                     command = launch.call_args.args[0]
                     fast = acceleration == "fast" or (acceleration is None and adapter == "full")

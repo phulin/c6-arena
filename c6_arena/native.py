@@ -80,6 +80,7 @@ def run_game(
     adapter: str = "full",
     acceleration: str | None = None,
     city_frame: str = "native",
+    query_bindings: str = "live",
     regional_contact: bool = False,
     start_era: str | None = None,
     trace_crash: bool = False,
@@ -92,6 +93,8 @@ def run_game(
         raise ValueError("acceleration must be native, or fast with the full adapter")
     if city_frame not in ("native", "shadow", "fast") or (city_frame != "native" and adapter != "full"):
         raise ValueError("city_frame must be native, or shadow/fast with the full adapter")
+    if query_bindings not in ("live", "owned") or (query_bindings == "owned" and acceleration != "fast"):
+        raise ValueError("owned query_bindings require fast acceleration")
     if not 1 <= rounds <= (1000 if exploratory or until_victory else 100):
         raise ValueError("supported horizon is 1..100 rounds; explicit exploration allows 1..1000")
     if not 0 <= seed < 2**64:
@@ -119,6 +122,9 @@ def run_game(
         env["C6_ARENA_POLICY_TIMING_FILE"] = str(output / "policy-timing.jsonl")
         env["C6_ARENA_CHOICE_TIMING"] = "1"
         env["C6_ARENA_NATIVE_NPC_AI"] = "1"
+        if query_bindings == "owned":
+            env["C6_ARENA_ENTRY_BINDINGS"] = "owned"
+            env["C6_ARENA_OWNER_PREDICATE"] = "inline"
         if adapter == "full":
             env["C6_ARENA_ADAPTER"] = "full"
             env["C6_ARENA_UNIT_SELECTION"] = "per-unit"
@@ -169,6 +175,7 @@ def run_game(
                     "adapter": adapter,
                     "acceleration": acceleration,
                     "city_frame": city_frame,
+                    "query_bindings": query_bindings,
                     "npc_control": "native",
                     "fixture": "+".join(fixtures) or None,
                     "start_era": start_era or "ERA_ANCIENT",

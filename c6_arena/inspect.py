@@ -169,6 +169,7 @@ def inspect_game(directory: Path) -> dict:
         "start_era": match.get("start_era", "ERA_ANCIENT"),
         "acceleration": match.get("acceleration", "native"),
         "city_frame": match.get("city_frame", "native"),
+        "query_bindings": match.get("query_bindings", "live"),
         "npc_control": match.get("npc_control"),
         "native_status": arena.get("status"), "native_phase": arena.get("phase"),
         "completed_half_turns": arena.get("completed_half_turns"),
