@@ -113,7 +113,7 @@ def inspect_game(directory: Path) -> dict:
         "pending_decision": arena.get("pending_decision"),
         "native_failures": [line for line in runtime.get("stderr", "").splitlines()
                             if line.startswith("C6_") and (
-                                line.startswith("C6_AI_PREP unavailable ") or
+                                line.startswith(("C6_AI_PREP unavailable ", "C6_CRASH signal ")) or
                                 any(token in line.lower() for token in (
                                     "unsupported", "refusal", "failure", "choice_failed", "boundary_stall")))][-10:],
         "policies": match.get("policies", {}),
