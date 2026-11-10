@@ -247,6 +247,12 @@ Game, Map and offset tables and preserves native wrapping and sentinel rules.
 Use `--city-geometry native` for the unfused path or `--city-geometry shadow`
 for native coordinate comparisons.
 
+Fast runs index building definitions that can supply entertainment, skipping inert
+entries while retaining native ownership, power and regional calculations.
+Use `--amenities-index native` for the original scan or `--amenities-index shadow`
+to check the index against native values. Selecting a non-native `--city-frame`
+automatically disables this separate index; explicit overlapping settings are rejected.
+
 Bootstrap symbol inspection caches derived tables by current binary/tool content.
 Each run retains cache hit counts and costs in `preparation-timing.jsonl`.
 

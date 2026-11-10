@@ -80,7 +80,7 @@ def run_game(
     adapter: str = "full",
     acceleration: str | None = None,
     city_frame: str = "native",
-    amenities_index: str = "native",
+    amenities_index: str | None = None,
     city_geometry: str | None = None,
     query_bindings: str | None = None,
     yield_neighbors: str | None = None,
@@ -96,6 +96,8 @@ def run_game(
         raise ValueError("acceleration must be native, or fast with the full adapter")
     if city_frame not in ("native", "shadow", "fast") or (city_frame != "native" and adapter != "full"):
         raise ValueError("city_frame must be native, or shadow/fast with the full adapter")
+    if amenities_index is None:
+        amenities_index = "fast" if acceleration == "fast" and city_frame == "native" else "native"
     if amenities_index not in ("native", "shadow", "fast") or (amenities_index != "native" and adapter != "full"):
         raise ValueError("amenities_index must be native, or shadow/fast with the full adapter")
     if amenities_index != "native" and city_frame != "native":

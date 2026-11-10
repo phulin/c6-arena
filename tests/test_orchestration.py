@@ -175,21 +175,21 @@ class SchedulingTests(unittest.TestCase):
                          "C6_ARENA_ENTRY_BINDINGS": "untrusted",
                          "C6_ARENA_OWNER_PREDICATE": "untrusted",
                          "C6_NATIVE_CONTROLLER": "external"}
-            for adapter, acceleration in (("full", "native"), ("full", "fast"), ("limited", "native"),
-                                          ("full", None), ("limited", None)):
-                with self.subTest(adapter=adapter, acceleration=acceleration), patch.dict("os.environ", inherited), patch(
+            for adapter, acceleration, frame_mode in (("full", "native", "shadow"), ("full", "fast", "native"),
+                                                      ("limited", "native", "native"), ("full", None, "native"),
+                                                      ("limited", None, "native"), ("full", "fast", "shadow")):
+                with self.subTest(adapter=adapter, acceleration=acceleration, frame=frame_mode), patch.dict("os.environ", inherited), patch(
                         "c6_arena.native.runner_lock", return_value=nullcontext()), patch(
                         "c6_arena.native.build_bridge", return_value=bridge), patch(
                         "c6_arena.native.subprocess.check_output", return_value="commit\n"), patch(
                         "c6_arena.native.subprocess.Popen") as launch, patch(
                         "c6_arena.inspect.inspect_game", return_value={"outcome": "truncated"}):
                     launch.return_value.wait.return_value = 0
-                    output = root / f"{adapter}-{acceleration}"
+                    output = root / f"{adapter}-{acceleration}-{frame_mode}"
                     owned = acceleration == "fast" or (acceleration is None and adapter == "full")
                     binding_mode = None if acceleration is None else ("owned" if owned else "live")
                     neighbor_mode = None if acceleration is None else ("shadow" if adapter == "full" else "native")
-                    frame_mode = "shadow" if adapter == "full" and acceleration == "native" else "native"
-                    amenities_mode = "shadow" if adapter == "full" and acceleration != "native" else "native"
+                    amenities_mode = "shadow" if adapter == "full" and acceleration == "fast" and frame_mode == "native" else None
                     run_game({0: script, 1: script}, output, harness=harness, adapter=adapter,
                              acceleration=acceleration, query_bindings=binding_mode,
                              yield_neighbors=neighbor_mode,
@@ -219,7 +219,9 @@ class SchedulingTests(unittest.TestCase):
                     expected_geometry = ("fast" if owned else "native") if acceleration is None else (
                         "shadow" if adapter == "full" else "native")
                     self.assertEqual(command[command.index("--city-hexspace-kernel") + 1], expected_geometry)
-                    self.assertEqual(command[command.index("--amenities-index-kernel") + 1], amenities_mode)
+                    expected_amenities = amenities_mode or ("fast" if fast and frame_mode == "native" else "native")
+                    self.assertEqual(command[command.index("--amenities-index-kernel") + 1], expected_amenities)
+                    self.assertEqual(json.loads((output / "match.json").read_text())["amenities_index"], expected_amenities)
                     self.assertNotIn("--omit-ai-prep", command)
                     self.assertNotIn("--omit-research-prep", command)
 
