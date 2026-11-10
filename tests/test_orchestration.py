@@ -63,6 +63,20 @@ class InspectionTests(unittest.TestCase):
         (self.path / "policies").mkdir()
         (self.path / "policies" / "seat-0.lua").write_text("return function(ctx) return 1 end")
         self.assertIn("return function", reflection_packet(self.path)["script"])
+        self.assertEqual(reflection_packet(self.path)["decisions"][0]["owner"], 0)
+        self.assertEqual(reflection_packet(self.path, owner=1)["decisions"], [])
+
+    def test_ordering_another_unit_is_not_delaying_foundation(self):
+        row = {"sequence": 0, "owner": 0, "kind": "unit", "selected": 1, "error": None,
+               "options": [{"name": "move", "actor": 1}, {"name": "found_city", "actor": 2}]}
+        (self.path / "decisions.jsonl").write_text(json.dumps(row) + "\n")
+        self.assertEqual(inspect_game(self.path)["delayed_founding_choices"], 0)
+
+    def test_missing_final_trace_rows_are_detected(self):
+        arena = json.loads((self.path / "native" / "arena.json").read_text())
+        arena["submitted_orders"] = 2
+        write_json(self.path / "native" / "arena.json", arena)
+        self.assertFalse(inspect_game(self.path)["checks"]["trace_count"])
 
 
 class SchedulingTests(unittest.TestCase):
