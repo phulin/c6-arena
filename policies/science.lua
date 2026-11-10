@@ -2,7 +2,7 @@
 -- runtime supplies only permitted observations and already-legal choices.
 -- The current native adapter supplies fewer observations/actions than the richer
 -- context interface. Missing information is not treated as knowledge of the map.
-local memory = {founded = 0, settlers_ordered = 0, visits = {}, trails = {}, last = {}, orders = {}}
+local memory = {founded = 0, settlers_ordered = 0, visits = {}, trails = {}, last = {}, orders = {}, governors = {}}
 local function name(option) return string.upper(option.name or option.action or "") end
 local function key(x, y) return tostring(x) .. "," .. tostring(y) end
 local function clamp(x, a, b) return math.max(a, math.min(b, x)) end
@@ -272,6 +272,14 @@ local function score_option(ctx, option, s)
         return score
     end
     if kind == "governor" then
+        if n == "ASSIGN_GOVERNOR" then
+            local city = s.cities[option.value] or s.cities[key(option.x, option.y)] or {}
+            local educator = memory.governors[option.actor] == "GOVERNOR_THE_EDUCATOR"
+            local score = (city.population or 0) * 6 + (city.production or 0) * 2
+            if educator then score = score + (city.science or 0) * 8 end
+            if memory.capital and key(option.x, option.y) == memory.capital then score = score + 50 end
+            return score
+        end
         local scores = {GOVERNOR_THE_EDUCATOR=180, GOVERNOR_THE_RESOURCE_MANAGER=160,
             GOVERNOR_THE_BUILDER=130, GOVERNOR_THE_DEFENDER=50,
             GOVERNOR_PROMOTION_EDUCATOR_RESEARCHER=260,
@@ -333,7 +341,12 @@ return function(ctx)
     end
     local chosen = ctx.options[best]
     if ctx.kind == "unit" then
-        if name(chosen) == "FOUND_CITY" then memory.founded = memory.founded + 1 end
+        if name(chosen) == "FOUND_CITY" then
+            if memory.founded == 0 and chosen.origin_x and chosen.origin_y then
+                memory.capital = key(chosen.origin_x, chosen.origin_y)
+            end
+            memory.founded = memory.founded + 1
+        end
         if name(chosen) == "MOVE" and chosen.x and chosen.y then
             local actor, position = chosen.actor or 0, key(chosen.x, chosen.y)
             memory.visits[actor] = memory.visits[actor] or {}
@@ -355,6 +368,8 @@ return function(ctx)
         memory.orders[city] = memory.orders[city] or {}
         memory.orders[city][name(chosen)] = (memory.orders[city][name(chosen)] or 0) + 1
         if name(chosen) == "UNIT_SETTLER" then memory.settlers_ordered = memory.settlers_ordered + 1 end
+    elseif ctx.kind == "governor" and name(chosen):sub(1, 13) == "GOVERNOR_THE_" then
+        memory.governors[chosen.actor or 0] = name(chosen)
     end
     return best, string.format("science/%s %s %s score=%.1f threat=%.2f", s.phase, ctx.kind, name(chosen), best_score, s.threat)
 end

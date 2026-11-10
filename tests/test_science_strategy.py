@@ -133,6 +133,13 @@ class ScienceStrategyTests(unittest.TestCase):
             "GOVERNOR_PROMOTION_EDUCATOR_SPACE_INITIATIVE"], observation={
                 "known_technologies": {"TECH_ROCKETRY": True}})["selected"], 2)
 
+    def test_assign_governor_using_remembered_capital_location(self):
+        self.choose("unit", options=[{"name": "found_city", "origin_x": 4, "origin_y": 5}])
+        self.choose("governor", options=[{"name": "GOVERNOR_THE_EDUCATOR", "actor": 3}])
+        self.assertEqual(self.choose("governor", options=[
+            {"name": "ASSIGN_GOVERNOR", "actor": 3, "value": 2, "x": 8, "y": 9},
+            {"name": "ASSIGN_GOVERNOR", "actor": 3, "value": 1, "x": 4, "y": 5}])["selected"], 2)
+
     def test_city_citizens_do_not_starve_for_production(self):
         self.assertEqual(self.choose("city_citizens", options=[
             {"name": "ASSIGN", "production": 50, "starvation": True},
