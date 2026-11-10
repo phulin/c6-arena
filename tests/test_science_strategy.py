@@ -153,6 +153,17 @@ class ScienceStrategyTests(unittest.TestCase):
         self.assertEqual(self.choose("congress", options=[{"name": "votes", "value": 8},
             {"name": "votes", "value": 1}])["selected"], 2)
 
+    def test_purchase_menu_returns_to_pass_when_nothing_is_useful(self):
+        menu = [{"name": "PASS", "actor": 9}, {"name": "OPEN_PURCHASES", "actor": 9}]
+        observation = {"turn": 100, "player": {"treasury": 1500, "city_count": 8}}
+        self.assertEqual(self.choose("city_economy", options=menu, observation=observation)["selected"], 2)
+        self.assertEqual(self.choose("city_purchases", options=[{"name": "BACK", "actor": 9},
+            {"name": "UNIT_SCOUT", "actor": 9, "metadata": {"currency": "gold", "gold_cost": 50}}],
+            observation=observation)["selected"], 1)
+        self.assertEqual(self.choose("city_economy", options=menu, observation=observation)["selected"], 1)
+        observation["turn"] += 1
+        self.assertEqual(self.choose("city_economy", options=menu, observation=observation)["selected"], 2)
+
     def test_governor_promotions_follow_science_then_space_plan(self):
         self.assertEqual(self.choose("governor", ["GOVERNOR_THE_RESOURCE_MANAGER",
             "GOVERNOR_PROMOTION_EDUCATOR_RESEARCHER"])["selected"], 2)

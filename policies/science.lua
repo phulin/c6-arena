@@ -2,7 +2,7 @@
 -- runtime supplies only permitted observations and already-legal choices.
 -- The current native adapter supplies fewer observations/actions than the richer
 -- context interface. Missing information is not treated as knowledge of the map.
-local memory = {founded = 0, settlers_ordered = 0, visits = {}, trails = {}, last = {}, orders = {}, governors = {}, unit_types = {}}
+local memory = {founded = 0, settlers_ordered = 0, visits = {}, trails = {}, last = {}, orders = {}, governors = {}, unit_types = {}, city_menu_turns = {}}
 local function name(option) return string.upper(option.name or option.action or "") end
 local function key(x, y) return tostring(x) .. "," .. tostring(y) end
 local function clamp(x, a, b) return math.max(a, math.min(b, x)) end
@@ -288,6 +288,14 @@ local function score_option(ctx, option, s)
     end
     if kind == "city_economy" then
         if n == "PASS" then return 0 end
+        if n == "OPEN_PURCHASES" then
+            local seen = memory.city_menu_turns[option.actor] == (s.observation.turn or 0)
+            return not seen and ((s.player.treasury or 0) > 1000 or (s.player.faith or 0) > 500) and 10 or -10
+        end
+        return -10
+    end
+    if kind == "city_purchases" then
+        if n == "PASS" or n == "BACK" then return 0 end
         if n:sub(1,9) == "BUILDING_" or n:sub(1,9) == "DISTRICT_" or n:sub(1,5) == "UNIT_" then
             local reserve = option.currency == "gold" and 1000 or 500
             local balance = option.currency == "gold" and (s.player.treasury or 0) or (s.player.faith or 0)
@@ -295,6 +303,7 @@ local function score_option(ctx, option, s)
         end
         return -10
     end
+    if kind == "city_yield_focus" then return n == "BACK" and 10 or 0 end
     if kind == "great_work" then return (n == "KEEP" or n == "PASS" or n == "KEEP_GREAT_WORKS") and 10 or 0 end
     if kind == "government_optional" then
         if n == "REASSIGN_POLICIES" or n == "APPLY_POLICY_CHANGES" then return 10 end
@@ -397,6 +406,7 @@ return function(ctx)
         if score > best_score then best, best_score = i, score end
     end
     local chosen = ctx.options[best]
+    if ctx.kind == "city_purchases" then memory.city_menu_turns[chosen.actor] = s.observation.turn or 0 end
     if ctx.kind == "unit" then
         if name(chosen) == "FOUND_CITY" then
             if memory.founded == 0 and chosen.origin_x and chosen.origin_y then

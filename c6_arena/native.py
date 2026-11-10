@@ -117,6 +117,9 @@ def run_game(
             path.write_bytes(source)
             env[f"C6_ARENA_LUA_POLICY_{seat}"] = str(path)
             copied[str(seat)] = {"source": str(policies[seat].resolve()), "sha256": digest(path)}
+        # Other native NPC owners (for example city states) get their own VM
+        # running the copied NPC script, rather than falling back to built-in AI.
+        env["C6_ARENA_LUA_POLICY"] = str(output / "policies" / "seat-63.lua")
         # The bootstrap restricts its outputs to the harness's private namespace.
         # Move the finished artifacts into this run after the host has exited.
         native_output = harness / "artifacts" / f"lua-{uuid.uuid4().hex}"
@@ -134,6 +137,7 @@ def run_game(
                     "exploratory": exploratory,
                     "until_victory": until_victory,
                     "adapter": adapter,
+                    "npc_default": copied["63"],
                     "unit_selection": "per-unit" if until_victory or adapter == "full" else "pooled",
                     "policies": copied, "command": command,
                     "harness_commit": subprocess.check_output(
