@@ -106,13 +106,15 @@ class InspectionTests(unittest.TestCase):
         runtime["stderr"] = ("C6_ARENA unit_progress_refusal reason=actor_busy\n"
                              "C6_AI_PREP unavailable native_score_consumer 0x1fdf2d0\n"
                              "C6_CRASH signal SIGSEGV core_rva 0x1fe5670\n"
-                             "C6_WHITELIST private_planner_reads_unavailable 0\n")
+                             "C6_WHITELIST private_planner_reads_unavailable 0\n"
+                             'C6_CHOICE_PROFILE {"version":1,"categories":{"unit_basic_enumeration":{"cpu_seconds":0.25}}}\n')
         write_json(self.path / "native/runtime.json", runtime)
         result = inspect_game(self.path)
         self.assertIn("actor_busy", result["native_failures"][0])
         self.assertIn("native_score_consumer", result["native_failures"][1])
         self.assertIn("core_rva 0x1fe5670", result["native_failures"][2])
         self.assertEqual(len(result["native_failures"]), 3)
+        self.assertEqual(result["choice_profile"]["categories"]["unit_basic_enumeration"]["cpu_seconds"], 0.25)
         self.assertEqual(result["final_turn"], 2)
 
     def test_missing_and_broken_trace(self):

@@ -135,6 +135,15 @@ def inspect_game(directory: Path) -> dict:
                            and (not match.get("until_victory") or terminal_within_budget),
     }
     complete = all(checks.values())
+    choice_profile = {}
+    for line in runtime.get("stderr", "").splitlines():
+        if line.startswith("C6_CHOICE_PROFILE "):
+            try:
+                profile = json.loads(line[len("C6_CHOICE_PROFILE "):])
+                if isinstance(profile, dict) and isinstance(profile.get("categories"), dict):
+                    choice_profile = profile
+            except ValueError:
+                continue
     policy_timing = {}
     timing_path = directory / "policy-timing.jsonl"
     if timing_path.exists():
@@ -173,6 +182,7 @@ def inspect_game(directory: Path) -> dict:
                                     "unsupported", "refusal", "failure", "choice_failed", "boundary_stall")))][-10:],
         "policies": match.get("policies", {}),
         "policy_timing": policy_timing,
+        "choice_profile": choice_profile,
         "diagnostics": {key: arena.get(key) for key in (
             "final_cities", "final_units", "founded_cities", "submitted_orders",
             "submitted_found_city", "submitted_skip", "submitted_move",

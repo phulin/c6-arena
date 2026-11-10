@@ -192,6 +192,11 @@ Lua function runs for each decision. These counters exclude native observation
 construction for the legacy v1 interface. V2 records demand-query CPU separately
 within the bridge call; the harness's broader policy timing includes both paths.
 
+`inspect` also exposes `choice_profile`: cumulative CPU and native-check counts
+for actor selection, unit/city menus and command execution. Enumeration timings
+exclude Lua and observation callbacks. Unit execution can include nested native
+callbacks, so its timer should not be added to the enumeration subtotal.
+
 `reflect` produces a compact JSON packet containing the script and summary for
 an LLM to edit. Read the referenced trace for more context, save a modified
 script, commit it, then run `compare` against its parent. This initial version
