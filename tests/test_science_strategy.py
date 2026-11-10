@@ -22,7 +22,7 @@ class ScienceStrategyTests(unittest.TestCase):
     def test_found_capital_and_explain_choice(self):
         choice = self.choose("unit", ["skip", "move", "found_city"])
         self.assertEqual(choice["option"]["name"], "found_city")
-        self.assertIn("science/expand", choice["reason"])
+        self.assertIn("science unit FOUND_CITY", choice["reason"])
 
     def test_choose_settler_before_other_units_then_choose_its_order(self):
         choice = self.choose("unit_selection", options=[
@@ -81,7 +81,7 @@ class ScienceStrategyTests(unittest.TestCase):
         choice = self.choose("production", ["BUILDING_MONUMENT", "PROJECT_TERRESTRIAL_LASER"],
             observation={"player": {"exoplanet_launched": True}})
         self.assertEqual(choice["selected"], 2)
-        self.assertIn("science/accelerate", choice["reason"])
+        self.assertIn("PROJECT_TERRESTRIAL_LASER", choice["reason"])
         choice = self.choose("production", options=[
             {"name": "PROJECT_LAUNCH_EXOPLANET_EXPEDITION", "city_id": 1},
             {"name": "UNIT_ARCHER", "city_id": 1}], observation={
@@ -198,6 +198,26 @@ class ScienceStrategyTests(unittest.TestCase):
             {"name": "BUILDING_LIBRARY", "gold_cost": 500}, {"name": "PASS"}],
             observation={"player": {"treasury": 520}})["selected"], 2)
         self.assertEqual(self.choose("religion", ["BELIEF_FERTILITY_RITES", "BELIEF_DIVINE_SPARK"])["selected"], 2)
+
+    def test_selection_and_explanation_do_not_fetch_world_data(self):
+        self.assertEqual(self.choose("unit_selection", options=[{"name": "UNIT_WARRIOR", "actor": 1},
+            {"name": "UNIT_SETTLER", "actor": 2}], observation_id=1, observation_fields=["player", "cities", "units", "known_technologies"],
+            observation={field: object() for field in ("player", "cities", "units", "known_technologies")}
+            )["selected"], 2)
+
+    def test_unit_choice_queries_only_its_actor(self):
+        self.assertEqual(self.choose("unit", options=[{"name": "HEAL", "actor": 7},
+            {"name": "SKIP", "actor": 7}], observation_id=2,
+            observation_fields=["player", "cities", "units", "known_technologies"],
+            observation={field: object() for field in ("player", "cities", "units", "known_technologies")},
+            observation_queries=[dict(query="unit", a=7, b=0,
+                value={"id": 7, "type": "UNIT_WARRIOR", "health": 20, "max_health": 100})]
+            )["selected"], 1)
+
+    def test_missing_actor_query_does_not_fetch_roster(self):
+        self.assertEqual(self.choose("unit", options=[{"name": "SKIP", "actor": 99}],
+            observation_id=3, observation_fields=["units"], observation={"units": object()},
+            observation_queries=[dict(query="unit", a=99, b=0, value=None)])["selected"], 1)
 
     def test_unknown_decision_stops_explicitly(self):
         with self.assertRaises(RuntimeError):

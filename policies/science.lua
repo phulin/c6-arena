@@ -59,31 +59,67 @@ local army = {
 }
 local function situation(ctx)
     local o = ctx.observation or {}
-    local p = o.player or {}
-    local cities, units, active_units = {}, {}, o.units and {} or nil
-    local strongest = nil
-    for _, city in ipairs(o.cities or {}) do
-        if city.id then cities[city.id] = city end
-        if city.x and city.y then cities[key(city.x, city.y)] = city end
-        if not strongest or (city.production or 0) > (strongest.production or 0) then strongest = city end
+    local s, computed, unit_cache = {observation=o}, {}, {}
+    local getters = {}
+    getters.player = function() return o.player or {} end
+    getters.cities = function()
+        local cities, strongest = {}, nil
+        for _, city in ipairs(o.cities or {}) do
+            if city.id then cities[city.id] = city end
+            if city.x and city.y then cities[key(city.x, city.y)] = city end
+            if not strongest or (city.production or 0) > (strongest.production or 0) then strongest = city end
+        end
+        s.strongest, computed.strongest = strongest, true
+        return cities
     end
-    for _, unit in ipairs(o.units or {}) do
-        if unit.id then units[unit.id] = unit end
-        if unit.alive ~= false and unit.is_on_map ~= false then active_units[#active_units+1] = unit end
+    getters.strongest = function() local cities = s.cities; return rawget(s, "strongest") end
+    getters.units = function()
+        local units, source = {}, o.units
+        local active = source and {} or nil
+        for _, unit in ipairs(source or {}) do
+            if unit.id then units[unit.id] = unit end
+            if unit.alive ~= false and unit.is_on_map ~= false then active[#active+1] = unit end
+        end
+        s.active_units, computed.active_units = active, true
+        return units
     end
-    local city_count = p.city_count
-    if city_count == nil then city_count = o.cities and #o.cities or memory.founded end
-    local threat = p.threat or 0
-    if p.enemy_strength and p.military_strength then
-        threat = math.max(threat, clamp(p.enemy_strength / math.max(1, p.military_strength) - 0.5, 0, 2))
+    getters.active_units = function() local units = s.units; return rawget(s, "active_units") end
+    getters.city_count = function()
+        if s.player.city_count ~= nil then return s.player.city_count end
+        return o.cities and #o.cities or memory.founded
     end
-    if p.at_war then threat = math.max(threat, 0.8) end
-    local phase = "expand"
-    if city_count >= 6 or (o.turn and o.turn >= 110) then phase = "develop" end
-    if o.known_technologies and o.known_technologies.TECH_ROCKETRY then phase = "space" end
-    if p.exoplanet_launched then phase = "accelerate" end
-    return {observation=o, player=p, cities=cities, units=units, active_units=active_units, city_count=city_count,
-        threat=threat, phase=phase, strongest=strongest}
+    getters.threat = function()
+        local p = s.player
+        local threat = p.threat or 0
+        if p.enemy_strength and p.military_strength then
+            threat = math.max(threat, clamp(p.enemy_strength / math.max(1, p.military_strength) - 0.5, 0, 2))
+        end
+        if p.at_war then threat = math.max(threat, 0.8) end
+        return threat
+    end
+    getters.phase = function()
+        if s.player.exoplanet_launched then return "accelerate" end
+        if o.known_technologies and o.known_technologies.TECH_ROCKETRY then return "space" end
+        if s.city_count >= 6 or (o.turn and o.turn >= 110) then return "develop" end
+        return "expand"
+    end
+    s.unit = function(actor)
+        if actor == nil then return {} end
+        if not unit_cache[actor] then
+            local unit
+            if ctx.world then unit = ctx.world:unit(actor) else unit = s.units[actor] end
+            unit_cache[actor] = unit or {}
+        end
+        return unit_cache[actor]
+    end
+    return setmetatable(s, {__index=function(_, field)
+        if not computed[field] and getters[field] then
+            local value = getters[field]()
+            rawset(s, field, value)
+            computed[field] = true
+        end
+        return rawget(s, field)
+    end})
 end
 local function production(option, s)
     local n = name(option)
@@ -161,7 +197,7 @@ local function production(option, s)
 end
 local function unit_action(option, s)
     local n = name(option)
-    local unit = s.units[option.actor] or {}
+    local unit = s.unit(option.actor)
     local unit_type = unit.type or memory.unit_types[option.actor]
     local hp = unit.health and unit.health / (unit.max_health or 100) or 1
     local civilian = unit.role == "settler" or unit.role == "builder" or unit.role == "trader"
@@ -456,5 +492,10 @@ return function(ctx)
     elseif ctx.kind == "governor" and name(chosen):sub(1, 13) == "GOVERNOR_THE_" then
         memory.governors[chosen.actor or 0] = name(chosen)
     end
-    return best, string.format("science/%s %s %s score=%.1f threat=%.2f", s.phase, ctx.kind, name(chosen), best_score, s.threat)
+    -- Explanations must not fetch world data that scoring did not need.
+    local phase, threat = rawget(s, "phase"), rawget(s, "threat")
+    local reason = string.format("science%s %s %s score=%.1f", phase and "/" .. phase or "",
+        ctx.kind, name(chosen), best_score)
+    if threat then reason = reason .. string.format(" threat=%.2f", threat) end
+    return best, reason
 end

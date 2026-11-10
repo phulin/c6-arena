@@ -79,6 +79,7 @@ def run_game(
     until_victory: bool = False,
     adapter: str = "full",
     acceleration: str | None = None,
+    city_frame: str = "native",
     regional_contact: bool = False,
     start_era: str | None = None,
     trace_crash: bool = False,
@@ -89,6 +90,8 @@ def run_game(
         acceleration = "fast" if adapter == "full" else "native"
     if acceleration not in ("native", "fast") or (acceleration == "fast" and adapter != "full"):
         raise ValueError("acceleration must be native, or fast with the full adapter")
+    if city_frame not in ("native", "shadow", "fast") or (city_frame != "native" and adapter != "full"):
+        raise ValueError("city_frame must be native, or shadow/fast with the full adapter")
     if not 1 <= rounds <= (1000 if exploratory or until_victory else 100):
         raise ValueError("supported horizon is 1..100 rounds; explicit exploration allows 1..1000")
     if not 0 <= seed < 2**64:
@@ -152,6 +155,7 @@ def run_game(
                 "--map-coordinate-kernel", "fast", "--map-xy-kernel", "fast",
                 "--city-attributes-kernel", "fast", "--global-definitions-kernel", "fast",
             ])
+        command.extend(["--city-player-frame", city_frame])
         if start_era:
             command.extend(["--start-era", start_era])
         if trace_crash:
@@ -164,6 +168,7 @@ def run_game(
                     "until_victory": until_victory,
                     "adapter": adapter,
                     "acceleration": acceleration,
+                    "city_frame": city_frame,
                     "npc_control": "native",
                     "fixture": "+".join(fixtures) or None,
                     "start_era": start_era or "ERA_ANCIENT",

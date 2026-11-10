@@ -233,3 +233,10 @@ and automatic LLM mutation remain future extensions.
 
 Native build caches and outputs stay ignored. The tests use real Lua against
 synthetic requests and do not need proprietary assets or sibling repositories.
+
+Use `--city-frame shadow` to compare the city economic kernel with native results,
+or `--city-frame fast` to execute its admitted building, district and entertainment
+paths. The default is `native`. Tile calculations retain their native fallback
+with the full NPC profile. This setting is recorded in each match.
+Science strategy helpers fetch observations on demand; unit orders query their
+actor directly, and explanations only include phase/threat when scoring needed them.
