@@ -28,6 +28,7 @@ in seat 1. Both NPC seats explicitly use `random.lua`. `compare` runs each seed
 twice with major seats swapped. `schedule --seeds 1 2 3` previews those pairings.
 Use `--harness /path/to/c6-native-arena` to select a different checkout.
 The native harness requires its compiled inputs to be committed before launch.
+The runner uses the harness's compiler cache when `ccache` is available.
 
 ## A strategy is a Lua function
 

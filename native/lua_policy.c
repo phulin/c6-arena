@@ -137,6 +137,9 @@ int c6_arena_policy_reset_v1(void) {
     if(trace){fclose(trace);trace=NULL;}
     return 0;
 }
+__attribute__((destructor)) static void release_policy_states(void) {
+    c6_arena_policy_reset_v1();
+}
 int c6_arena_choose_v1(const struct c6_policy_request_v1 *r,uint32_t *selected) {
     if(!r||!selected||r->abi_version!=1||r->owner<0||r->owner>=64||
        !r->kind||!r->count||r->count>4096||!r->options||r->random_index>=r->count)return 197;

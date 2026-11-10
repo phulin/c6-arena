@@ -3,6 +3,8 @@ from __future__ import annotations
 import argparse
 import json
 from pathlib import Path
+import subprocess
+import sys
 
 from .compare import compare, paired_schedule
 from .inspect import inspect_game, reflection_packet
@@ -60,6 +62,6 @@ def main() -> int:
         if args.command == "compare" and not result["valid"]:
             return 1
         return 0
-    except (OSError, ValueError, RuntimeError) as error:
-        print(f"c6-arena: {error}", file=__import__("sys").stderr)
+    except (OSError, ValueError, RuntimeError, subprocess.SubprocessError) as error:
+        print(f"c6-arena: {error}", file=sys.stderr)
         return 1

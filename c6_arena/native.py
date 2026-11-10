@@ -95,11 +95,14 @@ def run_game(
         # The bootstrap restricts its outputs to the harness's private namespace.
         # Move the finished artifacts into this run after the host has exited.
         native_output = harness / "artifacts" / f"lua-{uuid.uuid4().hex}"
+        ccache_available = (shutil.which("ccache") is not None or
+                           (harness / "target/build-tools/ccache/usr/bin/ccache").is_file())
         command = [
             sys.executable, str(harness / "tools" / "benchmark.py"),
             "--runtime", "native", "--rounds", str(rounds),
             "--policy-seed", str(seed), "--production-pool", "settlers",
             "--profile", "timing", "--timeout", str(timeout),
+            "--build-cache", "ccache" if ccache_available else "off",
             "--output", str(native_output),
         ]
         metadata = {"schema": 1, "seed": seed, "rounds": rounds,
