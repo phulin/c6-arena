@@ -105,6 +105,7 @@ def inspect_game(directory: Path) -> dict:
         "game_over": bool(complete and terminal), "checks": checks, "errors": errors,
         "rounds": rounds, "seed": match.get("seed"),
         "exploratory": match.get("exploratory", False),
+        "fixture": match.get("fixture"),
         "native_status": arena.get("status"), "native_phase": arena.get("phase"),
         "completed_half_turns": arena.get("completed_half_turns"),
         "initial_turn": arena.get("initial_turn"), "final_turn": arena.get("final_turn"),

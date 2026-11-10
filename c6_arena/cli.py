@@ -29,6 +29,7 @@ def parser() -> argparse.ArgumentParser:
             command.add_argument("--seed", type=int, default=1)
             command.add_argument("--explore", action="store_true", help="allow up to 1000 requested rounds; unsupported decisions still stop")
             command.add_argument("--until-victory", action="store_true", help="require a native victory result; default safety cap 1000 rounds")
+            command.add_argument("--regional-contact", action="store_true", help="use the native initial-contact fixture for adapter checks")
         else:
             command.add_argument("--seeds", type=int, nargs="+", default=[1, 2, 3])
     command = commands.add_parser("schedule", help="preview paired seeds and seats")
@@ -57,7 +58,8 @@ def main() -> int:
                               seed=args.seed,
                               timeout=args.timeout if args.timeout is not None else (900 if args.until_victory else 600),
                               exploratory=args.explore,
-                              until_victory=args.until_victory, adapter=args.adapter)
+                              until_victory=args.until_victory, adapter=args.adapter,
+                              regional_contact=args.regional_contact)
         elif args.command == "compare":
             result = compare(args.candidate, args.reference, args.output, seeds=args.seeds,
                              harness=args.harness, rounds=args.rounds, timeout=args.timeout, adapter=args.adapter)

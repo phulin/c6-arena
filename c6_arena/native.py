@@ -78,6 +78,7 @@ def run_game(
     exploratory: bool = False,
     until_victory: bool = False,
     adapter: str = "full",
+    regional_contact: bool = False,
 ) -> dict:
     if adapter not in ("full", "limited"):
         raise ValueError("adapter must be full or limited")
@@ -132,11 +133,14 @@ def run_game(
             "--build-cache", "ccache" if ccache_available else "off",
             "--output", str(native_output),
         ]
+        if regional_contact:
+            command.append("--regional-contact")
         metadata = {"schema": 1, "seed": seed, "rounds": rounds,
                     "exploratory": exploratory,
                     "until_victory": until_victory,
                     "adapter": adapter,
                     "npc_control": "native",
+                    "fixture": "regional-contact" if regional_contact else None,
                     "unit_selection": "per-unit" if until_victory or adapter == "full" else "pooled",
                     "policies": copied, "command": command,
                     "harness_commit": subprocess.check_output(
