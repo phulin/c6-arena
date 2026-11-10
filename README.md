@@ -169,6 +169,12 @@ selection. `inspect` summarizes decisions by seat and highlights cases where
 FoundCity was available but delayed. Those are prompts for inspection, not
 automatic declarations of mistakes.
 
+`policy-timing.jsonl` records cumulative CPU timings per seat while the game
+runs: script/VM loading, Lua table construction, protected Lua execution, trace
+writing, and the complete bridge call. Loading happens once per seat; the returned
+Lua function runs for each decision. These counters exclude native observation
+construction, which is included in the harness's broader policy timing.
+
 `reflect` produces a compact JSON packet containing the script and summary for
 an LLM to edit. Read the referenced trace for more context, save a modified
 script, commit it, then run `compare` against its parent. This initial version
