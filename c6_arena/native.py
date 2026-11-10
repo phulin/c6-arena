@@ -80,6 +80,7 @@ def run_game(
     adapter: str = "full",
     acceleration: str | None = None,
     city_frame: str = "native",
+    amenities_index: str = "native",
     city_geometry: str | None = None,
     query_bindings: str | None = None,
     yield_neighbors: str | None = None,
@@ -95,6 +96,8 @@ def run_game(
         raise ValueError("acceleration must be native, or fast with the full adapter")
     if city_frame not in ("native", "shadow", "fast") or (city_frame != "native" and adapter != "full"):
         raise ValueError("city_frame must be native, or shadow/fast with the full adapter")
+    if amenities_index not in ("native", "shadow", "fast") or (amenities_index != "native" and adapter != "full"):
+        raise ValueError("amenities_index must be native, or shadow/fast with the full adapter")
     if city_geometry is None:
         city_geometry = "fast" if acceleration == "fast" else "native"
     if city_geometry not in ("native", "shadow", "fast") or (city_geometry != "native" and adapter != "full"):
@@ -175,7 +178,8 @@ def run_game(
                 "--city-attributes-kernel", "fast", "--global-definitions-kernel", "fast",
             ])
         command.extend(["--city-player-frame", city_frame, "--yield-neighbor-kernel", yield_neighbors,
-                        "--city-hexspace-kernel", city_geometry])
+                        "--city-hexspace-kernel", city_geometry,
+                        "--amenities-index-kernel", amenities_index])
         if start_era:
             command.extend(["--start-era", start_era])
         if trace_crash:
@@ -189,6 +193,7 @@ def run_game(
                     "adapter": adapter,
                     "acceleration": acceleration,
                     "city_frame": city_frame,
+                    "amenities_index": amenities_index,
                     "city_geometry": city_geometry,
                     "query_bindings": query_bindings,
                     "yield_neighbors": yield_neighbors,

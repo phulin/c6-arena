@@ -18,7 +18,7 @@ def compare(candidate: Path, reference: Path, output: Path, *, seeds: list[int],
             rounds: int = 10, timeout: int = 600, harness: Path = DEFAULT_HARNESS,
             adapter: str = "full", acceleration: str | None = None, city_frame: str = "native",
             query_bindings: str | None = None, yield_neighbors: str | None = None,
-            city_geometry: str | None = None) -> dict:
+            city_geometry: str | None = None, amenities_index: str = "native") -> dict:
     schedule = paired_schedule(seeds)
     if not 1 <= rounds <= 100 or timeout <= 0:
         raise ValueError("rounds must be 1..100 and timeout positive")
@@ -36,7 +36,7 @@ def compare(candidate: Path, reference: Path, output: Path, *, seeds: list[int],
                        else (snapshots["reference"], snapshots["candidate"]))
         game = run_game(policy_assignments(left, right), output / f"game-{index:03d}",
                         harness=harness, rounds=rounds, seed=case["seed"], timeout=timeout,
-                        adapter=adapter, acceleration=acceleration, city_frame=city_frame, city_geometry=city_geometry, query_bindings=query_bindings, yield_neighbors=yield_neighbors)
+                        adapter=adapter, acceleration=acceleration, city_frame=city_frame, amenities_index=amenities_index, city_geometry=city_geometry, query_bindings=query_bindings, yield_neighbors=yield_neighbors)
         games.append({**case, "summary": game})
         report = {"schema": 1, "candidate": str(candidate.resolve()),
                   "reference": str(reference.resolve()), "schedule": schedule,

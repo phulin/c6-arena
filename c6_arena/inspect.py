@@ -169,6 +169,7 @@ def inspect_game(directory: Path) -> dict:
         "start_era": match.get("start_era", "ERA_ANCIENT"),
         "acceleration": match.get("acceleration", "native"),
         "city_frame": match.get("city_frame", "native"),
+        "amenities_index": match.get("amenities_index", "native"),
         "city_geometry": match.get("city_geometry", "native"),
         "query_bindings": match.get("query_bindings", "live"),
         "yield_neighbors": match.get("yield_neighbors", "native"),
