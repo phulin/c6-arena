@@ -22,6 +22,7 @@ python3 -m c6_arena inspect runs/settle-1
 python3 -m c6_arena reflect runs/settle-1
 python3 -m c6_arena compare policies/settle.lua --seeds 1 2 3 --output runs/settle-v-random
 python3 -m c6_arena replay policies/science.lua examples/science_decisions.json
+python3 -m c6_arena run policies/science.lua --until-victory --output runs/full-game
 ```
 
 `run` pits your script in seat 0 against `--reference` (default: `random.lua`)
@@ -55,6 +56,9 @@ Lua's unseeded random functions are unavailable.
 | `unit` | `name` (`skip`, `fortify`, `found_city`, `move`), `actor`, `value` (operation hash), optional origin and target coordinates |
 | `production` | `name` (`UNIT_SCOUT`, `UNIT_WARRIOR`, etc.), `value` (definition index), city `x`, `y` |
 | `research`, `civic`, `commemoration` | `name` (original definition type, e.g. `TECH_WRITING`), `value` (native definition index) |
+| `government`, `policy`, `religion` | Native government, policy, or pantheon belief name and definition index; policy `actor` identifies its slot |
+| `governor` | Governor/promotion type name, or `ASSIGN_GOVERNOR` with governor actor, city ID, and city coordinates |
+| `congress` | Legal resolution target/option and vote-count choices, or results acknowledgement |
 
 All options also have `index`. Coordinates are flat `x`, `y`, `origin_x`,
 `origin_y` fields, omitted when unknown. Each seat has its own Lua VM. Basic
@@ -86,9 +90,10 @@ government/policy/governor choices, great people, Congress, purchases, citizen
 assignments and a modest religion policy. Movement remembers recent positions
 to avoid loops. State is private per seat; edits go directly in the Lua script.
 
-The strategy works with the current native choices and named definitions. Its
-later-game handlers have **scenario tests, not full-game validation**: the native
-adapter still lacks most later-game action enumeration and observations. The
+The strategy works with the native choices and named definitions. Mandatory
+government, policy, governor, pantheon and Congress choices use native adapters.
+Additional handlers for richer observations and actions have scenario tests;
+they do not imply the native adapter can enumerate every action in Civ VI. The
 replay command exercises supplied legal-choice contexts using the same Lua VM;
 it does not run a game or establish that those options are natively available.
 
@@ -144,22 +149,29 @@ does not call a paid model service or automatically promote candidates.
 
 ## Current scope
 
-The native harness supports bounded early-game play, not complete Civ VI games.
-This runner caps games at 100 rounds and stops on unsupported decisions. A
-successful horizon is reported as `truncated`; incomplete execution is
-`coverage_failure`. Neither is recorded as a policy win or loss.
+Ordinary bounded runs allow up to 100 rounds. A successful horizon is reported
+as `truncated`; incomplete execution is `coverage_failure`. Neither is a win.
+
+`run --until-victory` requires the native victory manager to record a winning
+team and victory type, followed by clean native shutdown. The summary then says
+`finished` and identifies `winner`, `winner_policy`, `winner_team`, and
+`victory_name`. It defaults to a safety budget of 1000 activation pairs, including
+interleaved Congress phases. This budget does not change the original game's
+turn limit or victory rules. Reaching the budget without a winner is a failure.
 
 For an explicit boundary-discovery run, `run --explore --rounds 500` permits a
-longer requested horizon (up to 1000). This does not add decision coverage or
-victory detection; unsupported branches still stop and no winner is inferred.
+longer requested horizon (up to 1000). Unsupported branches still stop and no
+winner is inferred from diagnostics or the requested horizon.
 
 The native API exposes the existing legal-choice subset, not a complete map or
-player observation. It covers unit orders, production, research, civics and era
-choices. World Congress and other unsupported branches still stop explicitly.
-City/unit totals currently combine both major seats, so comparisons retain
-diagnostics and traces without inventing a competitive score. Full observations,
-per-seat outcomes, checkpoint branching and automatic LLM mutation are future
-extensions to this shared framework.
+player observation. It covers unit orders and queued intent, production from a
+bounded pool (including Free Cities), research, civics, era dedications, mandatory
+policy/governor/pantheon choices, regular Congress ballots and result dismissal.
+Reopened human turns return to Lua for further unit orders. Discussion ballots
+and other unsupported branches still stop explicitly. City/unit totals combine
+both major seats; they never determine the winner. Full map observations,
+broader action coverage, checkpoint branching and automatic LLM mutation remain
+future extensions.
 
 Native build caches and outputs stay ignored. The tests use real Lua against
 synthetic requests and do not need proprietary assets or sibling repositories.
