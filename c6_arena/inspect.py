@@ -105,7 +105,7 @@ def inspect_game(directory: Path) -> dict:
         "pending_decision": arena.get("pending_decision"),
         "native_failures": [line for line in runtime.get("stderr", "").splitlines()
                             if line.startswith("C6_") and any(token in line.lower() for token in (
-                                "unsupported", "refusal", "unit_failure", "choice_failed", "boundary_stall"))][-10:],
+                                "unsupported", "unavailable", "refusal", "failure", "choice_failed", "boundary_stall"))][-10:],
         "policies": match.get("policies", {}),
         "diagnostics": {key: arena.get(key) for key in (
             "final_cities", "final_units", "founded_cities", "submitted_orders",
