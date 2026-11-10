@@ -71,18 +71,27 @@ def inspect_game(directory: Path) -> dict:
                 and isinstance(arena.get("victory_name"), str) and bool(arena["victory_name"])
                 and (arena.get("winner_player") is None or
                      type(arena["winner_player"]) is int and 0 <= arena["winner_player"] < 64))
-    terminal_within_budget = (terminal and type(rounds) is int
-        and arena.get("requested_rounds") == rounds
-        and type(arena.get("completed_half_turns")) is int
-        and 0 <= arena["completed_half_turns"] <= rounds * 2)
+    halves = arena.get("completed_half_turns")
+    game_turn_mode = arena.get("horizon_mode") == "game-turns" and not match.get("until_victory")
+    initial, final = arena.get("initial_turn"), arena.get("final_turn")
+    turn_delta = final - initial if type(initial) is int and type(final) is int else None
+    half_limit = arena.get("activation_half_turn_limit") if game_turn_mode else (
+        rounds * 2 if type(rounds) is int else None)
+    valid_budget = (type(rounds) is int and arena.get("requested_rounds") == rounds
+        and type(halves) is int and type(half_limit) is int and 0 <= halves <= half_limit)
+    if game_turn_mode:
+        valid_budget = (valid_budget and arena.get("requested_game_turns") == rounds
+            and type(turn_delta) is int and 0 <= turn_delta <= rounds
+            and arena.get("completed_game_turns") == turn_delta)
+    terminal_within_budget = terminal and valid_budget
+    completed_horizon = (valid_budget and turn_delta == rounds and (
+        halves >= 2 * rounds and halves % 2 == 0 if game_turn_mode else halves == 2 * rounds))
     checks = {
         "runner": match.get("status") == "finished" and match.get("returncode") == 0,
         "native": bool(run) and all(run.get(key) == 0 for key in (
             "driver_returncode", "native_returncode", "arena_status", "effective_returncode")),
         "boundary": arena.get("status") == 0 and arena.get("phase") == "complete",
-        "horizon": terminal_within_budget or type(rounds) is int and arena.get("requested_rounds") == rounds
-                   and arena.get("completed_half_turns") == 2 * rounds
-                   and arena.get("final_turn", 0) - arena.get("initial_turn", 0) == rounds,
+        "horizon": terminal_within_budget or completed_horizon,
         "cleanup": runtime.get("returncode") == 0 and all(runtime.get(key) is True for key in (
             "fixture_success", "framework_cleanup_proven", "client_cleanup_proven", "native_cleanup_requested")),
         "lua_trace": decision_count > 0 and not errors,
@@ -111,6 +120,8 @@ def inspect_game(directory: Path) -> dict:
         "npc_control": match.get("npc_control"),
         "native_status": arena.get("status"), "native_phase": arena.get("phase"),
         "completed_half_turns": arena.get("completed_half_turns"),
+        "horizon_mode": arena.get("horizon_mode", "activation-pairs"),
+        "completed_game_turns": turn_delta,
         "initial_turn": arena.get("initial_turn"), "final_turn": arena.get("final_turn"),
         "pending_decision": arena.get("pending_decision"),
         "native_failures": [line for line in runtime.get("stderr", "").splitlines()

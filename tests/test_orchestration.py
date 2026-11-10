@@ -62,6 +62,27 @@ class InspectionTests(unittest.TestCase):
         self.assertEqual(result["outcome"], "coverage_failure")
         self.assertIsNone(result["winner"])
 
+    def test_congress_activations_do_not_reduce_a_game_turn_horizon(self):
+        arena = json.loads((self.path / "native/arena.json").read_text())
+        arena.update(horizon_mode="game-turns", requested_game_turns=2, completed_game_turns=2,
+                     completed_half_turns=6, activation_half_turn_limit=20)
+        write_json(self.path / "native/arena.json", arena)
+        self.assertEqual(inspect_game(self.path)["outcome"], "truncated")
+        arena["completed_game_turns"] = 3
+        write_json(self.path / "native/arena.json", arena)
+        self.assertFalse(inspect_game(self.path)["checks"]["horizon"])
+
+    def test_bounded_victory_after_extra_congress_activations(self):
+        arena = json.loads((self.path / "native/arena.json").read_text())
+        arena.update(horizon_mode="game-turns", requested_game_turns=2, completed_game_turns=1,
+                     completed_half_turns=5, activation_half_turn_limit=20, final_turn=1,
+                     game_over=True, winner_team=0, winner_player=0, victory_type=1,
+                     victory_name="VICTORY_SCIENCE")
+        write_json(self.path / "native/arena.json", arena)
+        result = inspect_game(self.path)
+        self.assertEqual(result["outcome"], "finished")
+        self.assertEqual(result["winner"], 0)
+
     def test_full_game_request_cannot_succeed_from_horizon_only(self):
         match = json.loads((self.path / "match.json").read_text())
         match["until_victory"] = True
