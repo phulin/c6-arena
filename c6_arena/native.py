@@ -28,7 +28,7 @@ def write_json(path: Path, value: object) -> None:
 def build_bridge(output: Path | None = None) -> Path:
     cached = output is None
     source_hash = hashlib.sha256(b"".join((ROOT / "native" / name).read_bytes()
-        for name in ("lua_policy.c", "lua51.h", "policy_api.h"))).hexdigest()[:16]
+        for name in ("lua_policy.c", "lua51.h", "policy_api.h", "context_api.h"))).hexdigest()[:16]
     output = (output or ROOT / "build" / f"lua_policy-{source_hash}.so").resolve()
     if cached and output.exists():
         return output

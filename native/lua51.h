@@ -9,7 +9,7 @@ typedef struct lua_Debug lua_Debug;
 typedef int (*lua_CFunction)(lua_State *);
 typedef void (*lua_Hook)(lua_State *, lua_Debug *);
 typedef void *(*lua_Alloc)(void *, void *, size_t, size_t);
-enum { LUA_TNIL=0, LUA_TNUMBER=3, LUA_TFUNCTION=6,
+enum { LUA_TNIL=0, LUA_TNUMBER=3, LUA_TTABLE=5, LUA_TFUNCTION=6,
        LUA_REGISTRYINDEX=-10000, LUA_GLOBALSINDEX=-10002, LUA_MASKCOUNT=8 };
 extern lua_State *lua_newstate(lua_Alloc, void *);
 extern void lua_close(lua_State *);
@@ -17,6 +17,7 @@ extern void lua_settop(lua_State *, int);
 extern int lua_type(lua_State *, int);
 extern void lua_pushnil(lua_State *);
 extern void lua_pushinteger(lua_State *, ptrdiff_t);
+extern void lua_pushnumber(lua_State *, double);
 extern void lua_pushboolean(lua_State *, int);
 extern void lua_pushstring(lua_State *, const char *);
 extern void lua_pushcclosure(lua_State *, lua_CFunction, int);

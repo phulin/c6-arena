@@ -1,6 +1,8 @@
 #define _POSIX_C_SOURCE 200809L
 #include "policy_api.h"
+#include "context_api.h"
 #include "lua51.h"
+#include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -18,6 +20,9 @@ static struct policy *active;
 static const struct c6_policy_request_v1 *request;
 static unsigned long sequence;
 static FILE *trace;
+static const struct c6_value_v1 *context;
+static char last_reason[512];
+static unsigned context_nodes;
 
 static void *allocate(void *ud, void *ptr, size_t old, size_t size) {
     struct policy *p=ud;
@@ -66,10 +71,35 @@ static void json_string(FILE *out,const char *s) {
     }
     fputc('"',out);
 }
+static void json_value(FILE *out,const struct c6_value_v1 *v) {
+    switch(v->type){
+    case C6_NULL:fputs("null",out);break;
+    case C6_BOOL:fputs(v->number?"true":"false",out);break;
+    case C6_NUMBER:fprintf(out,"%.17g",v->number);break;
+    case C6_STRING:json_string(out,v->text);break;
+    default:
+        fputc(v->type==C6_ARRAY?'[':'{',out);
+        for(unsigned i=0;i<v->count;++i){
+            if(i)fputc(',',out);
+            if(v->type==C6_OBJECT){json_string(out,v->children[i].key);fputc(':',out);}
+            json_value(out,v->children+i);
+        }
+        fputc(v->type==C6_ARRAY?']':'}',out);
+    }
+}
 static void log_choice(uint32_t selected,const char *error) {
     if(!trace)return;
     fprintf(trace,"{\"sequence\":%lu,\"owner\":%d,\"kind\":",sequence++,request->owner);
     json_string(trace,request->kind);
+    if(context){
+        fputs(",\"context\":",trace);json_value(trace,context);
+        fputs(",\"selected\":",trace);
+        if(error)fputs("null",trace);else fprintf(trace,"%u",selected+1);
+        fputs(",\"error\":",trace);
+        if(error)json_string(trace,error);else fputs("null",trace);
+        fputs(",\"reason\":",trace);json_string(trace,last_reason);
+        fputs("}\n",trace);fflush(trace);return;
+    }
     fprintf(trace,",\"random_index\":%u,\"options\":[",request->random_index+1);
     for(uint32_t i=0;i<request->count;++i){
         const struct c6_policy_option_v1 *o=request->options+i;
@@ -83,6 +113,7 @@ static void log_choice(uint32_t selected,const char *error) {
     fputs("],\"selected\":",trace);
     if(error)fputs("null,\"error\":",trace);else fprintf(trace,"%u,\"error\":",selected+1);
     if(error)json_string(trace,error);else fputs("null",trace);
+    fputs(",\"reason\":",trace);json_string(trace,last_reason);
     fputs("}\n",trace);fflush(trace);
 }
 static int fail(lua_State *vm,const char *message) {
@@ -114,8 +145,32 @@ static int load_policy(struct policy *p,int owner) {
     p->ref=luaL_ref(p->vm,LUA_REGISTRYINDEX);
     return 0;
 }
+static void push_value(lua_State *vm,const struct c6_value_v1 *v,unsigned depth) {
+    if(depth>32||++context_nodes>20000)luaL_error(vm,"context exceeds size/depth limit");
+    switch(v->type){
+    case C6_NULL:lua_pushnil(vm);return;
+    case C6_BOOL:lua_pushboolean(vm,v->number!=0);return;
+    case C6_NUMBER:
+        if(!isfinite(v->number))luaL_error(vm,"context number must be finite");
+        lua_pushnumber(vm,v->number);return;
+    case C6_STRING:
+        if(!v->text)luaL_error(vm,"context string missing");
+        lua_pushstring(vm,v->text);return;
+    case C6_ARRAY:case C6_OBJECT:break;
+    default:luaL_error(vm,"unknown context type");return;
+    }
+    if(v->count>20000||(v->count&&!v->children))luaL_error(vm,"invalid context children");
+    lua_createtable(vm,v->type==C6_ARRAY?(int)v->count:0,v->type==C6_OBJECT?(int)v->count:0);
+    for(unsigned i=0;i<v->count;++i){
+        if(v->type==C6_OBJECT&&!v->children[i].key)luaL_error(vm,"context object key missing");
+        push_value(vm,v->children+i,depth+1);
+        if(v->type==C6_ARRAY)lua_rawseti(vm,-2,(int)i+1);
+        else lua_setfield(vm,-2,v->children[i].key);
+    }
+}
 static int call_policy(lua_State *vm) {
     lua_rawgeti(vm,LUA_REGISTRYINDEX,active->ref);
+    if(context){push_value(vm,context,0);lua_call(vm,1,2);return 2;}
     lua_createtable(vm,0,4);
     string_field(vm,"kind",request->kind);integer_field(vm,"owner",request->owner);
     integer_field(vm,"random_index",request->random_index+1);
@@ -129,30 +184,56 @@ static int call_policy(lua_State *vm) {
         if(o->flags&2){integer_field(vm,"origin_x",o->origin_x);integer_field(vm,"origin_y",o->origin_y);}
         lua_rawseti(vm,-2,(int)i+1);
     }
-    lua_setfield(vm,-2,"options");lua_call(vm,1,1);return 1;
+    lua_setfield(vm,-2,"options");lua_call(vm,1,2);return 2;
 }
 int c6_arena_policy_reset_v1(void) {
     for(unsigned i=0;i<64;++i){if(policies[i].vm)lua_close(policies[i].vm);policies[i]=(struct policy){0};}
-    active=NULL;request=NULL;sequence=0;
+    active=NULL;request=NULL;sequence=0;context=NULL;last_reason[0]=0;
     if(trace){fclose(trace);trace=NULL;}
     return 0;
 }
 __attribute__((destructor)) static void release_policy_states(void) {
     c6_arena_policy_reset_v1();
 }
-int c6_arena_choose_v1(const struct c6_policy_request_v1 *r,uint32_t *selected) {
+static int execute_choice(const struct c6_policy_request_v1 *r,uint32_t *selected) {
     if(!r||!selected||r->abi_version!=1||r->owner<0||r->owner>=64||
-       !r->kind||!r->count||r->count>4096||!r->options||r->random_index>=r->count)return 197;
+       !r->kind||!r->count||r->count>4096||(!context&&!r->options)||r->random_index>=r->count)return 197;
+    last_reason[0]=0;context_nodes=0;
     request=r;active=policies+r->owner;
     const char *trace_path=getenv("C6_ARENA_POLICY_TRACE");
     if(!trace&&trace_path){trace=fopen(trace_path,"a");if(!trace)return fail(NULL,"cannot open trace");}
     if(!active->vm&&load_policy(active,r->owner))return 197;
     lua_State *vm=active->vm;lua_settop(vm,0);active->ticks=HOOK_TICKS;
     lua_pushcclosure(vm,call_policy,0);
-    if(lua_pcall(vm,0,1,0))return fail(vm,"choice failed");
-    double index=lua_tonumber(vm,-1);
-    if(lua_type(vm,-1)!=LUA_TNUMBER||!(index>=1&&index<=r->count)||index!=(uint32_t)index)
+    if(lua_pcall(vm,0,2,0))return fail(vm,"choice failed");
+    double index=lua_tonumber(vm,-2);
+    if(lua_type(vm,-2)!=LUA_TNUMBER||!(index>=1&&index<=r->count)||index!=(uint32_t)index)
         return fail(NULL,"choice must be an integer index into options");
+    const char *reason=lua_tolstring(vm,-1,NULL);
+    if(reason)snprintf(last_reason,sizeof last_reason,"%s",reason);
     *selected=(uint32_t)index-1;lua_settop(vm,0);log_choice(*selected,NULL);
     return 0;
+}
+int c6_arena_choose_v1(const struct c6_policy_request_v1 *r,uint32_t *selected) {
+    context=NULL;return execute_choice(r,selected);
+}
+const char *c6_arena_last_reason_v1(void) {return last_reason;}
+int c6_arena_choose_context_v1(int32_t owner,const struct c6_value_v1 *v,uint32_t *selected) {
+    if(!v||v->type!=C6_OBJECT||v->count>64||!v->children)return 197;
+    const struct c6_value_v1 *kind=NULL,*options=NULL,*random=NULL,*seat=NULL;
+    for(unsigned i=0;i<v->count;++i){
+        const struct c6_value_v1 *field=v->children+i;
+        if(!field->key)return 197;
+        if(!strcmp(field->key,"kind"))kind=field;
+        if(!strcmp(field->key,"options"))options=field;
+        if(!strcmp(field->key,"random_index"))random=field;
+        if(!strcmp(field->key,"owner"))seat=field;
+    }
+    if(!kind||kind->type!=C6_STRING||!kind->text||!options||options->type!=C6_ARRAY||
+       !random||random->type!=C6_NUMBER||!isfinite(random->number)||random->number<1||
+       random->number>options->count||random->number!=(uint32_t)random->number||
+       !seat||seat->type!=C6_NUMBER||seat->number!=owner)return 197;
+    struct c6_policy_request_v1 r={.abi_version=1,.kind=kind->text,.owner=owner,
+        .count=options->count,.random_index=(uint32_t)random->number-1};
+    context=v;int status=execute_choice(&r,selected);context=NULL;return status;
 }

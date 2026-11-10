@@ -9,6 +9,7 @@ import sys
 from .compare import compare, paired_schedule
 from .inspect import inspect_game, reflection_packet
 from .native import DEFAULT_HARNESS, ROOT, build_bridge, policy_assignments, run_game
+from .policy import replay
 
 
 def parser() -> argparse.ArgumentParser:
@@ -29,6 +30,9 @@ def parser() -> argparse.ArgumentParser:
             command.add_argument("--seeds", type=int, nargs="+", default=[1, 2, 3])
     command = commands.add_parser("schedule", help="preview paired seeds and seats")
     command.add_argument("--seeds", type=int, nargs="+", default=[1, 2, 3])
+    command = commands.add_parser("replay", help="exercise Lua against supplied decision contexts (no game simulation)")
+    command.add_argument("script", type=Path)
+    command.add_argument("contexts", type=Path, help="JSON object or ordered list of decision contexts")
     for name in ("inspect", "reflect"):
         command = commands.add_parser(name)
         command.add_argument("directory", type=Path)
@@ -52,6 +56,8 @@ def main() -> int:
                              harness=args.harness, rounds=args.rounds, timeout=args.timeout)
         elif args.command == "schedule":
             result = paired_schedule(args.seeds)
+        elif args.command == "replay":
+            result = replay(args.script, args.contexts)
         elif args.command == "inspect":
             result = inspect_game(args.directory)
         else:
