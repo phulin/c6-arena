@@ -10,6 +10,23 @@ def read_json(path: Path) -> dict:
     return json.loads(path.read_text()) if path.exists() else {}
 
 
+def read_decisions(path: Path) -> tuple[list[dict], list[str]]:
+    rows, errors = [], []
+    if path.exists():
+        for line_number, line in enumerate(path.read_text().splitlines(), 1):
+            try:
+                row = json.loads(line)
+            except json.JSONDecodeError:
+                errors.append(f"incomplete or malformed trace line {line_number}")
+                continue
+            if not isinstance(row, dict) or not all(
+                    key in row for key in ("sequence", "owner", "kind", "options")):
+                errors.append(f"invalid trace row at line {line_number}")
+                continue
+            rows.append(row)
+    return rows, errors
+
+
 def inspect_game(directory: Path) -> dict:
     directory = directory.resolve()
     match = read_json(directory / "match.json")
@@ -17,8 +34,7 @@ def inspect_game(directory: Path) -> dict:
     runtime = read_json(directory / "native" / "runtime.json")
     run = read_json(directory / "native" / "run.json")
     trace = directory / "decisions.jsonl"
-    decisions = [json.loads(line) for line in trace.read_text().splitlines()] if trace.exists() else []
-    errors = []
+    decisions, errors = read_decisions(trace)
     counts: dict[int, Counter] = {}
     missed = []
     for sequence, row in enumerate(decisions):
@@ -80,7 +96,7 @@ def reflection_packet(directory: Path, owner: int = 0) -> dict:
     summary = inspect_game(directory)
     script = directory / "policies" / f"seat-{owner}.lua"
     trace = directory / "decisions.jsonl"
-    rows = [json.loads(line) for line in trace.read_text().splitlines()] if trace.exists() else []
+    rows, _ = read_decisions(trace)
     own = [row for row in rows if row["owner"] == owner]
     # Include actual inputs and selections, not just the aggregate summary.
     # Prioritize this seat's highlighted episodes, then cover its decision kinds.

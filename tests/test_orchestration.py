@@ -78,6 +78,14 @@ class InspectionTests(unittest.TestCase):
         write_json(self.path / "native" / "arena.json", arena)
         self.assertFalse(inspect_game(self.path)["checks"]["trace_count"])
 
+    def test_interrupted_trace_retains_readable_decisions(self):
+        with (self.path / "decisions.jsonl").open("a") as trace:
+            trace.write('{"sequence":1,"owner":')
+        result = inspect_game(self.path)
+        self.assertEqual(result["outcome"], "coverage_failure")
+        self.assertIn("trace line 2", result["errors"][0])
+        self.assertEqual(result["choices_by_seat"]["0"]["unit:skip"], 1)
+
 
 class SchedulingTests(unittest.TestCase):
     def test_swaps_seats_for_each_seed(self):
