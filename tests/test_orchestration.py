@@ -150,22 +150,28 @@ class SchedulingTests(unittest.TestCase):
                          "C6_ARENA_LUA_POLICY_63": "barbarian.lua",
                          "C6_ARENA_NATIVE_NPC_AI": "0",
                          "C6_NATIVE_CONTROLLER": "external"}
-            for adapter in ("full", "limited"):
-                with self.subTest(adapter=adapter), patch.dict("os.environ", inherited), patch(
+            for adapter, acceleration in (("full", "native"), ("full", "fast"), ("limited", "native")):
+                with self.subTest(adapter=adapter, acceleration=acceleration), patch.dict("os.environ", inherited), patch(
                         "c6_arena.native.runner_lock", return_value=nullcontext()), patch(
                         "c6_arena.native.build_bridge", return_value=bridge), patch(
                         "c6_arena.native.subprocess.check_output", return_value="commit\n"), patch(
                         "c6_arena.native.subprocess.Popen") as launch, patch(
                         "c6_arena.inspect.inspect_game", return_value={"outcome": "truncated"}):
                     launch.return_value.wait.return_value = 0
-                    output = root / adapter
-                    run_game({0: script, 1: script}, output, harness=harness, adapter=adapter)
+                    output = root / f"{adapter}-{acceleration}"
+                    run_game({0: script, 1: script}, output, harness=harness, adapter=adapter,
+                             acceleration=acceleration)
                     env = launch.call_args.kwargs["env"]
                     self.assertEqual(env["C6_ARENA_NATIVE_NPC_AI"], "1")
                     self.assertNotIn("C6_ARENA_LUA_POLICY_62", env)
                     self.assertNotIn("C6_ARENA_LUA_POLICY_63", env)
                     self.assertNotIn("C6_NATIVE_CONTROLLER", env)
                     self.assertEqual(json.loads((output / "match.json").read_text())["npc_control"], "native")
+                    command = launch.call_args.args[0]
+                    self.assertEqual("--getter-inline" in command, acceleration == "fast")
+                    self.assertEqual("--plt-binding" in command, acceleration == "fast")
+                    self.assertNotIn("--omit-ai-prep", command)
+                    self.assertNotIn("--omit-research-prep", command)
 
     def test_native_cache_links_survive_output_relocation(self):
         with tempfile.TemporaryDirectory() as temp:

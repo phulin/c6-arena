@@ -78,12 +78,15 @@ def run_game(
     exploratory: bool = False,
     until_victory: bool = False,
     adapter: str = "full",
+    acceleration: str = "native",
     regional_contact: bool = False,
     start_era: str | None = None,
     trace_crash: bool = False,
 ) -> dict:
     if adapter not in ("full", "limited"):
         raise ValueError("adapter must be full or limited")
+    if acceleration not in ("native", "fast") or (acceleration == "fast" and adapter != "full"):
+        raise ValueError("acceleration must be native, or fast with the full adapter")
     if not 1 <= rounds <= (1000 if exploratory or until_victory else 100):
         raise ValueError("supported horizon is 1..100 rounds; explicit exploration allows 1..1000")
     if not 0 <= seed < 2**64:
@@ -137,6 +140,8 @@ def run_game(
         ]
         if regional_contact:
             command.append("--regional-contact")
+        if acceleration == "fast":
+            command.extend(["--getter-inline", "wide", "--plt-binding", "fast"])
         if start_era:
             command.extend(["--start-era", start_era])
         if trace_crash:
@@ -148,6 +153,7 @@ def run_game(
                     "exploratory": exploratory,
                     "until_victory": until_victory,
                     "adapter": adapter,
+                    "acceleration": acceleration,
                     "npc_control": "native",
                     "fixture": "+".join(fixtures) or None,
                     "start_era": start_era or "ERA_ANCIENT",
