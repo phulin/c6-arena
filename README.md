@@ -82,14 +82,16 @@ and replay results. Older scripts returning just an index still work.
 
 ## Science strategy
 
-`policies/science.lua` is a complete decision policy targeting a science victory.
-It establishes cities and scouts, limits surplus settlers, develops science and
-production, responds to war and economic trouble, then prioritizes spaceports,
-satellite/moon/Mars/exoplanet projects and expedition acceleration. It includes
-combat, healing and retreat, builder improvements, trade routes, diplomacy,
-government/policy/governor choices, great people, Congress, purchases, citizen
-assignments and a modest religion policy. Movement remembers recent positions
-to avoid loops. State is private per seat; edits go directly in the Lua script.
+`policies/science.lua` is an initial science-oriented policy that can run a full
+native game. It expands, selects research and civics, and handles the adapter's
+unit and mandatory decisions. Movement remembers recent positions to avoid
+loops. State is private per seat; edits go directly in the Lua script.
+
+Native production currently offers Scout, Warrior, Builder, Settler, Monument,
+Granary and Water Mill. Campuses, science buildings, Spaceports and space
+projects are not exposed, so this adapter cannot yet execute a science victory.
+The script contains priorities for those actions, plus combat, improvements,
+trade and other richer decisions, exercised through supplied scenario contexts.
 
 The strategy works with the native choices and named definitions. Mandatory
 government, policy, governor, pantheon and Congress choices use native adapters.
