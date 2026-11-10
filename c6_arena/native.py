@@ -80,6 +80,7 @@ def run_game(
     adapter: str = "full",
     regional_contact: bool = False,
     start_era: str | None = None,
+    trace_crash: bool = False,
 ) -> dict:
     if adapter not in ("full", "limited"):
         raise ValueError("adapter must be full or limited")
@@ -138,6 +139,8 @@ def run_game(
             command.append("--regional-contact")
         if start_era:
             command.extend(["--start-era", start_era])
+        if trace_crash:
+            command.append("--trace-crash")
         fixtures = (["regional-contact"] if regional_contact else [])
         if start_era and start_era != "ERA_ANCIENT":
             fixtures.append(f"start-era:{start_era}")
