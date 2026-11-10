@@ -56,14 +56,17 @@ local army = {
 local function situation(ctx)
     local o = ctx.observation or {}
     local p = o.player or {}
-    local cities, units = {}, {}
+    local cities, units, active_units = {}, {}, o.units and {} or nil
     local strongest = nil
     for _, city in ipairs(o.cities or {}) do
         if city.id then cities[city.id] = city end
         if city.x and city.y then cities[key(city.x, city.y)] = city end
         if not strongest or (city.production or 0) > (strongest.production or 0) then strongest = city end
     end
-    for _, unit in ipairs(o.units or {}) do if unit.id then units[unit.id] = unit end end
+    for _, unit in ipairs(o.units or {}) do
+        if unit.id then units[unit.id] = unit end
+        if unit.alive ~= false and unit.is_on_map ~= false then active_units[#active_units+1] = unit end
+    end
     local city_count = p.city_count
     if city_count == nil then city_count = o.cities and #o.cities or memory.founded end
     local threat = p.threat or 0
@@ -75,7 +78,7 @@ local function situation(ctx)
     if city_count >= 6 or (o.turn and o.turn >= 110) then phase = "develop" end
     if o.known_technologies and o.known_technologies.TECH_ROCKETRY then phase = "space" end
     if p.exoplanet_launched then phase = "accelerate" end
-    return {observation=o, player=p, cities=cities, units=units, city_count=city_count,
+    return {observation=o, player=p, cities=cities, units=units, active_units=active_units, city_count=city_count,
         threat=threat, phase=phase, strongest=strongest}
 end
 local function production(option, s)
@@ -102,7 +105,7 @@ local function production(option, s)
     elseif n == "BUILDING_COAL_POWER_PLANT" or n == "BUILDING_OIL_POWER_PLANT" or n == "BUILDING_NUCLEAR_POWER_PLANT" then
         score = city.power_shortfall and city.power_shortfall > 0 and 245 or 100
     elseif n == "UNIT_SETTLER" then
-        local settlers = s.observation.units and count(s.observation.units, function(u) return u.type == "UNIT_SETTLER" end)
+        local settlers = s.active_units and count(s.active_units, function(u) return u.type == "UNIT_SETTLER" end)
             or math.max(0, memory.settlers_ordered - math.max(0, memory.founded - 1))
         score = s.phase == "expand" and 170 or 10
         score = score - settlers * 110 - s.threat * 230
@@ -111,18 +114,18 @@ local function production(option, s)
         if s.city_count >= 8 then score = -150 end
         if s.player.amenities and s.player.amenities < -2 then score = score - 100 end
     elseif n == "UNIT_SCOUT" then
-        local scouts = s.observation.units and count(s.observation.units, function(u) return u.type == "UNIT_SCOUT" end)
+        local scouts = s.active_units and count(s.active_units, function(u) return u.type == "UNIT_SCOUT" end)
             or (ordered[n] or 0)
         score = 130 - scouts * 150
         if s.phase ~= "expand" then score = score - 140 end
     elseif n == "UNIT_BUILDER" then
-        local builders = s.observation.units and count(s.observation.units, function(u) return u.type == "UNIT_BUILDER" end)
+        local builders = s.active_units and count(s.active_units, function(u) return u.type == "UNIT_BUILDER" end)
             or (ordered[n] or 0)
         score = 100 + math.min(100, (city.unimproved_worked_tiles or 0) * 30) - builders * 70
     elseif n == "UNIT_TRADER" then
         score = (s.player.trade_routes_available or 0) > 0 and 185 or -80
     elseif army[n] then
-        local soldiers = s.observation.units and count(s.observation.units, function(u) return army[u.type] end)
+        local soldiers = s.active_units and count(s.active_units, function(u) return army[u.type] end)
             or (ordered[n] or 0)
         local desired = math.max(2, math.ceil(s.city_count / 2))
         score = 60 + s.threat * 270 + math.max(0, desired - soldiers) * 55
