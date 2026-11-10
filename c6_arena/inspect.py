@@ -109,7 +109,9 @@ def inspect_game(directory: Path) -> dict:
         "policies": match.get("policies", {}),
         "diagnostics": {key: arena.get(key) for key in (
             "final_cities", "final_units", "founded_cities", "submitted_orders",
-            "submitted_found_city", "submitted_skip", "submitted_move")},
+            "submitted_found_city", "submitted_skip", "submitted_move",
+            "move_physical_arrivals", "move_progressed_with_queued_intent",
+            "move_queued_without_physical_progress")},
         "choices_by_seat": {str(owner): dict(counter) for owner, counter in counts.items()},
         "episodes": missed, "delayed_founding_choices": delayed_founding,
         "trace": str(trace),
