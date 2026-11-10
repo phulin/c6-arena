@@ -141,7 +141,12 @@ def run_game(
         if regional_contact:
             command.append("--regional-contact")
         if acceleration == "fast":
-            command.extend(["--getter-inline", "wide", "--plt-binding", "fast"])
+            command.extend([
+                "--getter-inline", "wide", "--plt-binding", "fast",
+                "--appeal-reuse", "skip", "--appeal-scalar-kernel", "lookup-fast",
+                "--map-coordinate-kernel", "fast", "--map-xy-kernel", "fast",
+                "--city-attributes-kernel", "fast", "--global-definitions-kernel", "fast",
+            ])
         if start_era:
             command.extend(["--start-era", start_era])
         if trace_crash:

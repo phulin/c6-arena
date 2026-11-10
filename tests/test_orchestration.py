@@ -170,6 +170,9 @@ class SchedulingTests(unittest.TestCase):
                     command = launch.call_args.args[0]
                     self.assertEqual("--getter-inline" in command, acceleration == "fast")
                     self.assertEqual("--plt-binding" in command, acceleration == "fast")
+                    self.assertEqual("--appeal-reuse" in command, acceleration == "fast")
+                    self.assertEqual("--appeal-scalar-kernel" in command, acceleration == "fast")
+                    self.assertEqual("--map-xy-kernel" in command, acceleration == "fast")
                     self.assertNotIn("--omit-ai-prep", command)
                     self.assertNotIn("--omit-research-prep", command)
 
