@@ -103,6 +103,7 @@ def run_game(
         env["C6_ARENA_POLICY_TRACE"] = str(output / "decisions.jsonl")
         if until_victory:
             env["C6_ARENA_REQUIRE_VICTORY"] = "1"
+            env["C6_ARENA_MAX_ACTIONS"] = "4096"
         copied = {}
         for seat, source in scripts.items():
             path = output / "policies" / f"seat-{seat}.lua"
