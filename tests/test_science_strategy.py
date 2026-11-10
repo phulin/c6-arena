@@ -135,6 +135,24 @@ class ScienceStrategyTests(unittest.TestCase):
             {"name": "VOTE", "blocks_own_victory": True},
             {"name": "VOTE", "science_bonus": 1}])["selected"], 2)
 
+    def test_native_full_adapter_choices_preserve_science_plan(self):
+        self.assertEqual(self.choose("production_control", ["KEEP_PRODUCTION", "UNIT_SCOUT"])["selected"], 1)
+        self.assertEqual(self.choose("production_control", ["UNIT_SCOUT", "DISTRICT_CAMPUS"])["selected"], 2)
+        self.assertEqual(self.choose("city_economy", options=[{"name": "BUILDING_LIBRARY", "metadata": {"currency": "gold"}},
+            {"name": "PASS"}], observation={"player": {"treasury": 50}})["selected"], 2)
+        self.assertEqual(self.choose("player_action", ["PASS", "RECRUIT_GREAT_PERSON"])["selected"], 2)
+        self.assertEqual(self.choose("great_work", ["MOVE_GREAT_WORK", "KEEP_GREAT_WORKS"])["selected"], 2)
+        self.assertEqual(self.choose("unit", ["skip", "REPAIR"])["selected"], 2)
+
+    def test_native_congress_metadata_avoids_incidental_diplomatic_victory(self):
+        options = [{"name": "ResolutionPlayerTarget", "value": 1,
+                    "metadata": {"resolution_name": "WC_RES_DIPLOVICTORY", "target_hash": 0}},
+                   {"name": "ResolutionPlayerTarget", "value": 2,
+                    "metadata": {"resolution_name": "WC_RES_DIPLOVICTORY", "target_hash": 0}}]
+        self.assertEqual(self.choose("congress", options=options, owner=0)["selected"], 2)
+        self.assertEqual(self.choose("congress", options=[{"name": "votes", "value": 8},
+            {"name": "votes", "value": 1}])["selected"], 2)
+
     def test_governor_promotions_follow_science_then_space_plan(self):
         self.assertEqual(self.choose("governor", ["GOVERNOR_THE_RESOURCE_MANAGER",
             "GOVERNOR_PROMOTION_EDUCATOR_RESEARCHER"])["selected"], 2)

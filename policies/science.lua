@@ -18,7 +18,7 @@ local function ranked(names)
 end
 local research = ranked({
     "TECH_POTTERY", "TECH_MINING", "TECH_WRITING", "TECH_ANIMAL_HUSBANDRY",
-    "TECH_ARCHERY", "TECH_CURRENCY", "TECH_IRRIGATION", "TECH_WHEEL",
+    "TECH_ARCHERY", "TECH_CURRENCY", "TECH_IRRIGATION", "TECH_THE_WHEEL",
     "TECH_MASONRY", "TECH_BRONZE_WORKING", "TECH_APPRENTICESHIP",
     "TECH_EDUCATION", "TECH_MACHINERY", "TECH_CONSTRUCTION", "TECH_ENGINEERING",
     "TECH_MATHEMATICS", "TECH_CELESTIAL_NAVIGATION", "TECH_SHIPBUILDING",
@@ -192,7 +192,7 @@ local function unit_action(option, s)
         if option.escorts_settler then score = score + 70 end
         if option.defends_city then score = score + 100 end
         if option.retreats and hp < 0.5 then score = score + 220 end
-    elseif n == "BUILD_IMPROVEMENT" or n == "REPAIR_IMPROVEMENT" or n == "REMOVE_FEATURE" then
+    elseif n == "BUILD_IMPROVEMENT" or n == "REPAIR_IMPROVEMENT" or n == "REPAIR" or n == "REPAIR_ROUTE" or n == "REMOVE_FEATURE" then
         score = 100 + (option.food_gain or 0) * 30 + (option.production_gain or 0) * 40 + (option.science_gain or 0) * 35
         if option.connects_resource then score = score + 85 end
         if option.powers_spaceport then score = score + 160 end
@@ -236,6 +236,9 @@ local function diplomacy(option, s)
     return score
 end
 local function score_option(ctx, option, s)
+    for field, value in pairs(option.metadata or {}) do
+        if option[field] == nil then option[field] = value end
+    end
     local n, kind = name(option), ctx.kind
     if kind == "unit_selection" then
         if n == "UNIT_SETTLER" then return 200 end
@@ -243,7 +246,10 @@ local function score_option(ctx, option, s)
         if n == "UNIT_BUILDER" then return 100 end
         return 10
     end
-    if kind == "production" then return production(option, s) end
+    if kind == "production" or kind == "production_control" then
+        if n == "KEEP_PRODUCTION" then return 10000 end
+        return production(option, s)
+    end
     if kind == "unit" then return unit_action(option, s) end
     if kind == "research" or kind == "civic" then
         local scores = kind == "research" and research or civics
@@ -263,6 +269,23 @@ local function score_option(ctx, option, s)
         return (scores[n] or 0) + (s.phase == "expand" and n == "COMMEMORATION_INFRASTRUCTURE" and 100 or 0)
     end
     if kind == "diplomacy" or kind == "trade" then return diplomacy(option, s) end
+    if kind == "player_action" then
+        if n == "RECRUIT_GREAT_PERSON" then return 180 end
+        if n == "GIVE_INFLUENCE_TOKEN" then return 40 end
+        if n == "DIPLOMACY_MAKE_PEACE" then return 100 end
+        if n == "LEVY_MILITARY" then return s.threat > 0.8 and 60 or -100 end
+        return n == "PASS" and 0 or -50
+    end
+    if kind == "city_economy" then
+        if n == "PASS" then return 0 end
+        if n:sub(1,9) == "BUILDING_" or n:sub(1,9) == "DISTRICT_" or n:sub(1,5) == "UNIT_" then
+            local reserve = option.currency == "gold" and 1000 or 500
+            local balance = option.currency == "gold" and (s.player.treasury or 0) or (s.player.faith or 0)
+            return balance > reserve and production(option,s) - 160 or -100
+        end
+        return -10
+    end
+    if kind == "great_work" then return (n == "KEEP" or n == "PASS" or n == "KEEP_GREAT_WORKS") and 10 or 0 end
     if kind == "government" then
         local scores = {GOVERNMENT_CLASSICAL_REPUBLIC=100, GOVERNMENT_MERCHANT_REPUBLIC=180,
             GOVERNMENT_DEMOCRACY=250, GOVERNMENT_SYNTHETIC_TECHNOCRACY=350}
@@ -315,6 +338,13 @@ local function score_option(ctx, option, s)
         return score
     end
     if kind == "congress" then
+        if n == "VOTES" then return -(option.value or 1) end
+        if option.resolution_name == "WC_RES_DIPLOVICTORY" then
+            -- This policy targets the space race; do not spend favor gaining
+            -- diplomatic victory points before completing it.
+            if option.value == 2 and option.target_hash == ctx.owner then return 100 end
+            if option.value == 1 and option.target_hash == ctx.owner then return -1000 end
+        end
         local score = (option.science_bonus or 0) * 20 + (option.production_bonus or 0) * 20
         if option.blocks_own_victory then score = score - 500 end
         if option.favor_cost and option.favor_cost > (s.player.favor or 0) / 3 then score = score - 150 end
