@@ -10,7 +10,7 @@
 /* Synchronous policy calls only, on the harness thread. A VM per owner keeps
  * strategy memory private. This limits accidental runaway scripts; it is not
  * a security boundary for hostile native code or a replacement for a process. */
-#define MEMORY_LIMIT (16u * 1024u * 1024u)
+#define MEMORY_LIMIT (64u * 1024u * 1024u)
 #define SOURCE_LIMIT (1024u * 1024u)
 #define HOOK_INTERVAL 1000
 #define HOOK_TICKS 1000
@@ -92,7 +92,13 @@ static void log_choice(uint32_t selected,const char *error) {
     fprintf(trace,"{\"sequence\":%lu,\"owner\":%d,\"kind\":",sequence++,request->owner);
     json_string(trace,request->kind);
     if(context){
-        fputs(",\"context\":",trace);json_value(trace,context);
+        /* Use the same trace shape for both native interfaces. Every policy
+         * input, including visible observations, remains replayable. */
+        for(unsigned i=0;i<context->count;++i){
+            const struct c6_value_v1 *field=context->children+i;
+            if(!strcmp(field->key,"owner")||!strcmp(field->key,"kind"))continue;
+            fputc(',',trace);json_string(trace,field->key);fputc(':',trace);json_value(trace,field);
+        }
         fputs(",\"selected\":",trace);
         if(error)fputs("null",trace);else fprintf(trace,"%u",selected+1);
         fputs(",\"error\":",trace);
@@ -146,7 +152,7 @@ static int load_policy(struct policy *p,int owner) {
     return 0;
 }
 static void push_value(lua_State *vm,const struct c6_value_v1 *v,unsigned depth) {
-    if(depth>32||++context_nodes>50000)luaL_error(vm,"context exceeds size/depth limit");
+    if(depth>32||++context_nodes>250000)luaL_error(vm,"context exceeds size/depth limit");
     if(!lua_checkstack(vm,4))luaL_error(vm,"context exceeds Lua stack limit");
     switch(v->type){
     case C6_NULL:lua_pushnil(vm);return;
@@ -160,7 +166,7 @@ static void push_value(lua_State *vm,const struct c6_value_v1 *v,unsigned depth)
     case C6_ARRAY:case C6_OBJECT:break;
     default:luaL_error(vm,"unknown context type");return;
     }
-    if(v->count>50000||(v->count&&!v->children))luaL_error(vm,"invalid context children");
+    if(v->count>250000||(v->count&&!v->children))luaL_error(vm,"invalid context children");
     lua_createtable(vm,v->type==C6_ARRAY?(int)v->count:0,v->type==C6_OBJECT?(int)v->count:0);
     for(unsigned i=0;i<v->count;++i){
         if(v->type==C6_OBJECT&&!v->children[i].key)luaL_error(vm,"context object key missing");

@@ -21,8 +21,14 @@ def iter_decisions(path: Path, errors: list[str]):
                     errors.append(f"incomplete or malformed trace line {line_number}")
                     continue
                 if not isinstance(row, dict) or not all(
-                        key in row for key in ("sequence", "owner", "kind", "options")):
+                        key in row for key in ("sequence", "owner", "kind")):
                     errors.append(f"invalid trace row at line {line_number}")
+                    continue
+                # Earlier rich-context traces nested their policy inputs.
+                if isinstance(row.get("context"), dict):
+                    row = {**row["context"], **row}
+                if "options" not in row:
+                    errors.append(f"missing options at trace line {line_number}")
                     continue
                 yield row
 

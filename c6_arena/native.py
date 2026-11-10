@@ -77,7 +77,10 @@ def run_game(
     rounds: int = 10, seed: int = 1, timeout: int = 600,
     exploratory: bool = False,
     until_victory: bool = False,
+    adapter: str = "full",
 ) -> dict:
+    if adapter not in ("full", "limited"):
+        raise ValueError("adapter must be full or limited")
     if not 1 <= rounds <= (1000 if exploratory or until_victory else 100):
         raise ValueError("supported horizon is 1..100 rounds; explicit exploration allows 1..1000")
     if not 0 <= seed < 2**64:
@@ -101,6 +104,9 @@ def run_game(
                if not key.startswith(("C6_ARENA_", "C6_NATIVE_"))}
         env["C6_ARENA_POLICY_LIBRARY"] = str(bridge)
         env["C6_ARENA_POLICY_TRACE"] = str(output / "decisions.jsonl")
+        if adapter == "full":
+            env["C6_ARENA_ADAPTER"] = "full"
+            env["C6_ARENA_UNIT_SELECTION"] = "per-unit"
         if until_victory:
             env["C6_ARENA_REQUIRE_VICTORY"] = "1"
             env["C6_ARENA_MAX_ACTIONS"] = "4096"
@@ -127,7 +133,8 @@ def run_game(
         metadata = {"schema": 1, "seed": seed, "rounds": rounds,
                     "exploratory": exploratory,
                     "until_victory": until_victory,
-                    "unit_selection": "per-unit" if until_victory else "pooled",
+                    "adapter": adapter,
+                    "unit_selection": "per-unit" if until_victory or adapter == "full" else "pooled",
                     "policies": copied, "command": command,
                     "harness_commit": subprocess.check_output(
                         ["git", "rev-parse", "HEAD"], cwd=harness, text=True).strip(),

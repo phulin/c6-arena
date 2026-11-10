@@ -7,6 +7,7 @@ import unittest
 from unittest.mock import patch
 
 from c6_arena.native import ROOT, build_bridge
+from c6_arena.policy import Value, encode
 
 
 class Option(ctypes.Structure):
@@ -71,6 +72,31 @@ class LuaPolicyTests(unittest.TestCase):
         script = (ROOT / "policies" / "random.lua").read_text()
         self.assertEqual(self.choose(script, random=1), (0, 1))
         self.assertEqual(self.choose(random=0), (0, 0))
+
+    def test_native_context_inputs_are_preserved_in_readable_trace(self):
+        (self.path / "strategy.lua").write_text("return function(ctx) assert(ctx.observation.turn == 42); return 1 end")
+        self.lib.c6_arena_choose_context_v1.argtypes = [ctypes.c_int32, ctypes.POINTER(Value), ctypes.POINTER(ctypes.c_uint32)]
+        context = {"owner": 0, "kind": "production", "random_index": 1,
+                   "options": [{"name": "PROJECT_LAUNCH_EARTH_SATELLITE", "city_id": 9}],
+                   "observation": {"turn": 42, "known_technologies": {"TECH_ROCKETRY": True}}}
+        keep = []
+        tree = encode(context, keep=keep)
+        selected = ctypes.c_uint32(999)
+        self.assertEqual(self.lib.c6_arena_choose_context_v1(0, ctypes.byref(tree), ctypes.byref(selected)), 0)
+        row = json.loads((self.path / "trace.jsonl").read_text())
+        self.assertEqual(row["options"], context["options"])
+        self.assertEqual(row["observation"], context["observation"])
+        self.assertEqual(row["selected"], 1)
+
+    def test_large_native_map_context_fits_policy_budget(self):
+        (self.path / "strategy.lua").write_text("return function(ctx) assert(#ctx.observation.plots == 20000); return 1 end")
+        self.lib.c6_arena_choose_context_v1.argtypes = [ctypes.c_int32, ctypes.POINTER(Value), ctypes.POINTER(ctypes.c_uint32)]
+        context = {"owner": 0, "kind": "unit", "random_index": 1, "options": [{"name": "skip"}],
+                   "observation": {"plots": [{"x": x, "y": 1, "visible": True} for x in range(20000)]}}
+        keep = []
+        tree = encode(context, keep=keep)
+        selected = ctypes.c_uint32(999)
+        self.assertEqual(self.lib.c6_arena_choose_context_v1(0, ctypes.byref(tree), ctypes.byref(selected)), 0)
 
     def test_fields_and_each_decision_kind(self):
         script = '''return function(ctx)

@@ -22,6 +22,7 @@ def parser() -> argparse.ArgumentParser:
         command.add_argument("--reference", type=Path, default=ROOT / "policies" / "random.lua")
         command.add_argument("--harness", type=Path, default=DEFAULT_HARNESS)
         command.add_argument("--output", type=Path, required=True)
+        command.add_argument("--adapter", choices=("full", "limited"), default="full")
         command.add_argument("--rounds", type=int, default=None if name == "run" else 10)
         command.add_argument("--timeout", type=int, default=None if name == "run" else 600)
         if name == "run":
@@ -56,10 +57,10 @@ def main() -> int:
                               seed=args.seed,
                               timeout=args.timeout if args.timeout is not None else (900 if args.until_victory else 600),
                               exploratory=args.explore,
-                              until_victory=args.until_victory)
+                              until_victory=args.until_victory, adapter=args.adapter)
         elif args.command == "compare":
             result = compare(args.candidate, args.reference, args.output, seeds=args.seeds,
-                             harness=args.harness, rounds=args.rounds, timeout=args.timeout)
+                             harness=args.harness, rounds=args.rounds, timeout=args.timeout, adapter=args.adapter)
         elif args.command == "schedule":
             result = paired_schedule(args.seeds)
         elif args.command == "replay":
