@@ -198,6 +198,8 @@ class SchedulingTests(unittest.TestCase):
                     self.assertNotIn("C6_ARENA_LUA_POLICY_62", env)
                     self.assertNotIn("C6_ARENA_LUA_POLICY_63", env)
                     self.assertNotIn("C6_NATIVE_CONTROLLER", env)
+                    self.assertEqual(env["C6_NATIVE_SYMBOL_CACHE_STATS_FILE"],
+                                     str(output.resolve() / "preparation-timing.jsonl"))
                     self.assertEqual(env.get("C6_ARENA_ENTRY_BINDINGS"), "owned" if owned else None)
                     self.assertEqual(env.get("C6_ARENA_OWNER_PREDICATE"), "inline" if owned else None)
                     self.assertEqual(json.loads((output / "match.json").read_text())["npc_control"], "native")

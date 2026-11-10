@@ -131,6 +131,7 @@ def run_game(
         env["C6_ARENA_POLICY_TIMING"] = "1"
         env["C6_ARENA_POLICY_TIMING_FILE"] = str(output / "policy-timing.jsonl")
         env["C6_ARENA_CHOICE_TIMING"] = "1"
+        env["C6_NATIVE_SYMBOL_CACHE_STATS_FILE"] = str(output / "preparation-timing.jsonl")
         env["C6_ARENA_NATIVE_NPC_AI"] = "1"
         if query_bindings == "owned":
             env["C6_ARENA_ENTRY_BINDINGS"] = "owned"
