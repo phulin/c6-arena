@@ -1,0 +1,30 @@
+[
+  {
+    "kind": "unit", "owner": 0, "random_index": 1,
+    "options": [{"name": "skip", "actor": 1}, {"name": "found_city", "actor": 1}]
+  },
+  {
+    "kind": "research", "owner": 0, "random_index": 1,
+    "options": [{"name": "TECH_ASTROLOGY"}, {"name": "TECH_WRITING"}]
+  },
+  {
+    "kind": "production", "owner": 0, "random_index": 1,
+    "observation": {"turn": 60, "player": {"city_count": 3, "threat": 1, "at_war": true}},
+    "options": [{"name": "UNIT_SETTLER"}, {"name": "UNIT_ARCHER"}]
+  },
+  {
+    "kind": "research", "owner": 0, "random_index": 1,
+    "observation": {"turn": 210, "known_technologies": {"TECH_ROCKETRY": true}},
+    "options": [{"name": "TECH_MINING"}, {"name": "TECH_SMART_MATERIALS"}]
+  },
+  {
+    "kind": "production", "owner": 0, "random_index": 1,
+    "observation": {"turn": 230, "known_technologies": {"TECH_ROCKETRY": true}},
+    "options": [{"name": "UNIT_BUILDER"}, {"name": "PROJECT_LAUNCH_EXOPLANET_EXPEDITION"}]
+  },
+  {
+    "kind": "production", "owner": 0, "random_index": 1,
+    "observation": {"turn": 250, "player": {"exoplanet_launched": true}},
+    "options": [{"name": "BUILDING_MONUMENT"}, {"name": "PROJECT_TERRESTRIAL_LASER"}]
+  }
+]

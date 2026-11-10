@@ -14,6 +14,7 @@ enum { LUA_TNIL=0, LUA_TNUMBER=3, LUA_TTABLE=5, LUA_TFUNCTION=6,
 extern lua_State *lua_newstate(lua_Alloc, void *);
 extern void lua_close(lua_State *);
 extern void lua_settop(lua_State *, int);
+extern int lua_checkstack(lua_State *, int);
 extern int lua_type(lua_State *, int);
 extern void lua_pushnil(lua_State *);
 extern void lua_pushinteger(lua_State *, ptrdiff_t);

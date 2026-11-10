@@ -7,7 +7,7 @@ from unittest.mock import patch
 
 from c6_arena.compare import compare, paired_schedule
 from c6_arena.inspect import inspect_game, reflection_packet
-from c6_arena.native import ROOT, policy_assignments, run_game, write_json
+from c6_arena.native import ROOT, policy_assignments, retain_native_output, run_game, write_json
 
 
 def completed_fixture(path):
@@ -88,6 +88,22 @@ class InspectionTests(unittest.TestCase):
 
 
 class SchedulingTests(unittest.TestCase):
+    def test_native_cache_links_survive_output_relocation(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            source, destination = root / "harness/artifacts/game", root / "run/native"
+            source.mkdir(parents=True)
+            destination.parent.mkdir()
+            cache = root / "harness/captures/rules"
+            cache.parent.mkdir(parents=True)
+            cache.write_text("rules")
+            (source / "rules.sqlite").symlink_to("../../captures/rules")
+            (source / "data").write_text("game")
+            (source / "data-link").symlink_to("data")
+            retain_native_output(source, destination)
+            self.assertEqual((destination / "rules.sqlite").read_text(), "rules")
+            self.assertEqual((destination / "data-link").read_text(), "game")
+
     def test_swaps_seats_for_each_seed(self):
         self.assertEqual(paired_schedule([7, 8]), [
             {"seed": 7, "candidate_seat": 0, "reference_seat": 1},

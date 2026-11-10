@@ -25,6 +25,19 @@ def write_json(path: Path, value: object) -> None:
     path.write_text(json.dumps(value, indent=2, sort_keys=True) + "\n")
 
 
+def retain_native_output(source: Path, destination: Path) -> None:
+    """Preserve the harness's relative cache links when moving its output."""
+    source, destination = source.resolve(), destination.resolve()
+    for path in source.rglob("*"):
+        if path.is_symlink():
+            target = path.resolve(strict=True)
+            if target.is_relative_to(source):
+                target = destination / target.relative_to(source)
+            path.unlink()
+            path.symlink_to(target)
+    shutil.move(str(source), destination)
+
+
 def build_bridge(output: Path | None = None) -> Path:
     cached = output is None
     source_hash = hashlib.sha256(b"".join((ROOT / "native" / name).read_bytes()
@@ -129,13 +142,13 @@ def run_game(
                 write_json(output / "match.json", metadata)
                 if isinstance(error, KeyboardInterrupt):
                     if native_output.exists():
-                        shutil.move(str(native_output), output / "native")
+                        retain_native_output(native_output, output / "native")
                     raise
             else:
                 metadata.update(status="finished" if code == 0 else "failed", returncode=code)
                 write_json(output / "match.json", metadata)
         if native_output.exists():
-            shutil.move(str(native_output), output / "native")
+            retain_native_output(native_output, output / "native")
         from .inspect import inspect_game
         summary = inspect_game(output)
         write_json(output / "summary.json", summary)

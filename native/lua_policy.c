@@ -13,7 +13,7 @@
 #define MEMORY_LIMIT (16u * 1024u * 1024u)
 #define SOURCE_LIMIT (1024u * 1024u)
 #define HOOK_INTERVAL 1000
-#define HOOK_TICKS 200
+#define HOOK_TICKS 1000
 struct policy { lua_State *vm; size_t bytes; int ref, ticks; };
 static struct policy policies[64];
 static struct policy *active;
@@ -146,7 +146,8 @@ static int load_policy(struct policy *p,int owner) {
     return 0;
 }
 static void push_value(lua_State *vm,const struct c6_value_v1 *v,unsigned depth) {
-    if(depth>32||++context_nodes>20000)luaL_error(vm,"context exceeds size/depth limit");
+    if(depth>32||++context_nodes>50000)luaL_error(vm,"context exceeds size/depth limit");
+    if(!lua_checkstack(vm,4))luaL_error(vm,"context exceeds Lua stack limit");
     switch(v->type){
     case C6_NULL:lua_pushnil(vm);return;
     case C6_BOOL:lua_pushboolean(vm,v->number!=0);return;
@@ -159,7 +160,7 @@ static void push_value(lua_State *vm,const struct c6_value_v1 *v,unsigned depth)
     case C6_ARRAY:case C6_OBJECT:break;
     default:luaL_error(vm,"unknown context type");return;
     }
-    if(v->count>20000||(v->count&&!v->children))luaL_error(vm,"invalid context children");
+    if(v->count>50000||(v->count&&!v->children))luaL_error(vm,"invalid context children");
     lua_createtable(vm,v->type==C6_ARRAY?(int)v->count:0,v->type==C6_OBJECT?(int)v->count:0);
     for(unsigned i=0;i<v->count;++i){
         if(v->type==C6_OBJECT&&!v->children[i].key)luaL_error(vm,"context object key missing");
