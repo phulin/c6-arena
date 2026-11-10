@@ -26,7 +26,9 @@ python3 -m c6_arena run policies/science.lua --until-victory --output runs/full-
 ```
 
 `run` pits your script in seat 0 against `--reference` (default: `random.lua`)
-in seat 1. Both NPC seats explicitly use `random.lua`. `compare` runs each seed
+in seat 1. Barbarians, city states and Free Cities use the built-in AI, including
+its native planning and turn processing. Lua scripts control the two competing
+civilizations. `compare` runs each seed
 twice with major seats swapped. `schedule --seeds 1 2 3` previews those pairings.
 Use `--harness /path/to/c6-native-arena` to select a different checkout.
 The native harness requires its compiled inputs to be committed before launch.
@@ -54,23 +56,31 @@ Lua's unseeded random functions are unavailable.
 | Decision kind | Option fields |
 | --- | --- |
 | `unit_selection` | Full-game mode: ready unit `name=UNIT_*`, `actor`, native type index and known coordinates; choose a unit before its command |
-| `unit` | `name` (`skip`, `fortify`, `found_city`, `move`), `actor`, `value` (operation hash), optional origin and target coordinates |
-| `production` | `name` (`UNIT_SCOUT`, `UNIT_WARRIOR`, etc.), `value` (definition index), city `x`, `y` |
+| `unit` | Native civilian, military, religious, spy and cultural orders; actor, parameters, origin and target coordinates |
+| `production`, `production_control` | All loaded unit, building, district and project definitions; placement, formation, city ID; KEEP/CHANGE for existing queues |
 | `research`, `civic`, `commemoration` | `name` (original definition type, e.g. `TECH_WRITING`), `value` (native definition index) |
 | `government`, `policy`, `religion` | Native government, policy, or pantheon belief name and definition index; policy `actor` identifies its slot |
 | `governor` | Governor/promotion type name, or `ASSIGN_GOVERNOR` with governor actor, city ID, and city coordinates |
 | `congress` | Legal resolution targets, discussion vote directions, vote counts, or results acknowledgement |
+| `government_optional`, `policy_optional` | Government changes, policy unlocks, and complete policy slates with confirmation |
+| `city_economy`, `city_purchases`, `city_citizens`, `city_yield_focus` | Gold/faith purchases, worker locks, and yield preferences; PASS/BACK navigation |
+| `player_action` | Great Person recruitment/patronage/rejection, envoys, and minor diplomacy/levies |
+| `diplomacy`, `diplomacy_*` | Sessions, responses and typed deal editing, answered on the recipient's native turn |
+| `great_work`, `spy_escape` | Artifact/Great Work choices and native escape routes |
 
 All options also have `index`. Coordinates are flat `x`, `y`, `origin_x`,
 `origin_y` fields, omitted when unknown. Each seat has its own Lua VM. Basic
 Lua, table, string, and math functions are available; file/process/package/debug
 APIs are unavailable. Each call has a 1,000,000-instruction budget and each VM a
-16 MiB allocation limit. Invalid choices and script errors stop the run.
+64 MiB allocation limit. Invalid choices and script errors stop the run.
 These limits catch ordinary script mistakes; this is not isolation for hostile
 code. Scripts are text, not Lua bytecode.
 
 The native harness enumerates legal choices and executes the selected native
-operation. Its existing hooks suppress supported built-in policy selection.
+operation. Hooks reserve human-major choices for Lua and retain built-in NPC AI.
+Full mode supplies `ctx.observation` and descriptive `option.metadata`, including
+purchase costs, Great Person classes, promotion/improvement names, government
+comparison/anarchy, Congress targets, and deal amount ranges.
 The Lua bridge receives copied scalar choices, never raw engine pointers. The
 stable ABI is `native/policy_api.h`, mirrored by the harness's
 `native/external_policy.h` (native indices are zero based). Without a plugin,
@@ -87,30 +97,31 @@ native game. It expands, selects research and civics, and handles the adapter's
 unit and mandatory decisions. Movement remembers recent positions to avoid
 loops. State is private per seat; edits go directly in the Lua script.
 
-Native production currently offers Scout, Warrior, Builder, Settler, Monument,
-Granary and Water Mill. Campuses, science buildings, Spaceports and space
-projects are not exposed, so this adapter cannot yet execute a science victory.
-The script contains priorities for those actions, plus combat, improvements,
-trade and other richer decisions, exercised through supplied scenario contexts.
+Native production enumerates all loaded definitions, including Campuses,
+science buildings, Spaceports and space projects. Districts and wonders include
+legal placement choices, projects retain native restrictions, and units include
+corps/army variants. Existing queues can be retained or replaced.
 
-The strategy works with the native choices and named definitions. Mandatory
-government, policy, governor, pantheon and Congress choices use native adapters.
-Additional handlers for richer observations and actions have scenario tests;
-they do not imply the native adapter can enumerate every action in Civ VI. The
-replay command exercises supplied legal-choice contexts using the same Lua VM;
-it does not run a game or establish that those options are natively available.
+The strategy uses native observations and named definitions. Scenario tests also
+exercise individual decisions through the same Lua VM. Replay exercises supplied
+contexts; it does not run a game or establish a victory.
 
 ## Rich decision contexts
 
-The optional `native/context_api.h` interface copies nested objects and arrays
-into Lua. The original native choice ABI remains supported. `c6_arena.policy.LuaPolicy`
+The `native/context_api.h` interface copies nested objects and arrays into Lua
+and is used by the full native adapter. The original choice ABI remains supported
+for bounded compatibility checks. `c6_arena.policy.LuaPolicy`
 uses the richer interface for decision tests and ordered replay, retaining the
 script's memory between calls. Contexts have `kind`, `owner`, `options`, and
 `random_index`, plus an optional `observation`. Arrays are one based in Lua;
-JSON null values become nil. Limit contexts to depth 32 and 50,000 values.
+JSON null values become nil. Limit contexts to depth 32 and 250,000 values.
 
-The science script accepts these observation fields when an adapter can supply
-them from information available to that seat:
+Native snapshots include actual turn, economy, owned cities/queues/buildings,
+unit lifecycle and combat statistics, known technologies/civics, science victory
+progress, known players and visible foreign actors. Revealed plots include
+static terrain; current plot details are supplied on visible or owned plots.
+Unknown and hidden information stays omitted. The script also accepts these
+optional descriptive fields:
 
 | Field | Meaning |
 | --- | --- |
@@ -139,7 +150,7 @@ not bypass any unsupported native decision.
 
 ## Inspect and mutate
 
-Every run keeps copies of its Lua files, the bridge, script hashes, native
+Every run keeps copies of its major-seat Lua files, the bridge, script hashes, native
 outputs, and `decisions.jsonl`. The trace records each offered choice and the
 selection. `inspect` summarizes decisions by seat and highlights cases where
 FoundCity was available but delayed. Those are prompts for inspection, not
@@ -168,15 +179,15 @@ For an explicit boundary-discovery run, `run --explore --rounds 500` permits a
 longer requested horizon (up to 1000). Unsupported branches still stop and no
 winner is inferred from diagnostics or the requested horizon.
 
-The native API exposes the existing legal-choice subset, not a complete map or
-player observation. It covers unit orders and queued intent, production from a
-bounded pool (including Free Cities), research, civics, era dedications, mandatory
-policy/governor/pantheon choices, Congress ballots and result dismissal.
-Reopened human turns return to Lua for further unit orders. Unsupported branches
-still stop explicitly. City/unit totals combine
-both major seats; they never determine the winner. Full map observations,
-broader action coverage, checkpoint branching and automatic LLM mutation remain
-future extensions.
+The default `full` adapter targets standard XP2 gameplay with the loaded rules.
+It covers production, unit commands/operations, government/policies/governors,
+religion, culture, diplomacy/deals, purchases/citizens, research and Congress.
+Reopened human turns return to Lua for further orders. Native AI controls NPCs.
+Scripted scenario/DLC-specific actions and native strategic automation are
+outside this catalog; unknown branches stop explicitly. `--adapter limited`
+retains the earlier bounded major action pool for debugging. City/unit totals
+combine both major seats and never determine the winner. Checkpoint branching
+and automatic LLM mutation remain future extensions.
 
 Native build caches and outputs stay ignored. The tests use real Lua against
 synthetic requests and do not need proprietary assets or sibling repositories.
