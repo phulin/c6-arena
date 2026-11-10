@@ -98,6 +98,8 @@ def run_game(
         raise ValueError("city_frame must be native, or shadow/fast with the full adapter")
     if amenities_index not in ("native", "shadow", "fast") or (amenities_index != "native" and adapter != "full"):
         raise ValueError("amenities_index must be native, or shadow/fast with the full adapter")
+    if amenities_index != "native" and city_frame != "native":
+        raise ValueError("amenities_index and city_frame kernels require separate runs")
     if city_geometry is None:
         city_geometry = "fast" if acceleration == "fast" else "native"
     if city_geometry not in ("native", "shadow", "fast") or (city_geometry != "native" and adapter != "full"):

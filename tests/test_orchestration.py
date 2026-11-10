@@ -188,11 +188,12 @@ class SchedulingTests(unittest.TestCase):
                     owned = acceleration == "fast" or (acceleration is None and adapter == "full")
                     binding_mode = None if acceleration is None else ("owned" if owned else "live")
                     neighbor_mode = None if acceleration is None else ("shadow" if adapter == "full" else "native")
+                    frame_mode = "shadow" if adapter == "full" and acceleration == "native" else "native"
+                    amenities_mode = "shadow" if adapter == "full" and acceleration != "native" else "native"
                     run_game({0: script, 1: script}, output, harness=harness, adapter=adapter,
                              acceleration=acceleration, query_bindings=binding_mode,
                              yield_neighbors=neighbor_mode,
-                             city_frame="shadow" if adapter == "full" else "native",
-                             amenities_index="shadow" if adapter == "full" else "native",
+                             city_frame=frame_mode, amenities_index=amenities_mode,
                              city_geometry=None if acceleration is None else ("shadow" if adapter == "full" else "native"))
                     env = launch.call_args.kwargs["env"]
                     self.assertEqual(env["C6_ARENA_NATIVE_NPC_AI"], "1")
@@ -211,16 +212,14 @@ class SchedulingTests(unittest.TestCase):
                     self.assertEqual("--appeal-reuse" in command, fast)
                     self.assertEqual("--appeal-scalar-kernel" in command, fast)
                     self.assertEqual("--map-xy-kernel" in command, fast)
-                    self.assertEqual(command[command.index("--city-player-frame") + 1],
-                                     "shadow" if adapter == "full" else "native")
+                    self.assertEqual(command[command.index("--city-player-frame") + 1], frame_mode)
                     expected_neighbor = ("fast" if owned else "native") if acceleration is None else (
                         "shadow" if adapter == "full" else "native")
                     self.assertEqual(command[command.index("--yield-neighbor-kernel") + 1], expected_neighbor)
                     expected_geometry = ("fast" if owned else "native") if acceleration is None else (
                         "shadow" if adapter == "full" else "native")
                     self.assertEqual(command[command.index("--city-hexspace-kernel") + 1], expected_geometry)
-                    self.assertEqual(command[command.index("--amenities-index-kernel") + 1],
-                                     "shadow" if adapter == "full" else "native")
+                    self.assertEqual(command[command.index("--amenities-index-kernel") + 1], amenities_mode)
                     self.assertNotIn("--omit-ai-prep", command)
                     self.assertNotIn("--omit-research-prep", command)
 
