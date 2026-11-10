@@ -20,4 +20,5 @@ struct c6_policy_request_v1 {
 };
 /* Returns 0 on success. An error MUST stop execution, never use built-in AI. */
 int c6_arena_choose_v1(const struct c6_policy_request_v1 *, uint32_t *selected);
+int c6_arena_policy_reset_v1(void);
 #endif

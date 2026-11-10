@@ -1,0 +1,136 @@
+"""Build the reusable bridge and run the sibling native harness."""
+from __future__ import annotations
+
+from contextlib import contextmanager
+import fcntl
+import hashlib
+import json
+import os
+from pathlib import Path
+import shutil
+import signal
+import subprocess
+import sys
+
+ROOT = Path(__file__).resolve().parents[1]
+DEFAULT_HARNESS = ROOT.parent / "c6-native-arena"
+
+
+def digest(path: Path) -> str:
+    return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def write_json(path: Path, value: object) -> None:
+    path.write_text(json.dumps(value, indent=2, sort_keys=True) + "\n")
+
+
+def build_bridge(output: Path | None = None) -> Path:
+    cached = output is None
+    source_hash = hashlib.sha256(b"".join((ROOT / "native" / name).read_bytes()
+        for name in ("lua_policy.c", "lua51.h", "policy_api.h"))).hexdigest()[:16]
+    output = (output or ROOT / "build" / f"lua_policy-{source_hash}.so").resolve()
+    if cached and output.exists():
+        return output
+    output.parent.mkdir(parents=True, exist_ok=True)
+    temporary = output.with_name(f".{output.name}.{os.getpid()}.tmp")
+    # LuaJIT's stable Lua 5.1 C ABI; a runtime package is enough (no SDK needed).
+    subprocess.run([
+        "cc", "-std=c11", "-O2", "-Wall", "-Wextra", "-Werror", "-fPIC",
+        "-shared", str(ROOT / "native" / "lua_policy.c"),
+        "-Wl,-z,defs", "-Wl,-l:libluajit-5.1.so.2", "-o", str(temporary),
+    ], check=True)
+    temporary.replace(output)
+    return output
+
+
+@contextmanager
+def runner_lock(harness: Path):
+    """One runner per native repository, including its Git worktrees."""
+    common = subprocess.check_output(
+        ["git", "rev-parse", "--path-format=absolute", "--git-common-dir"],
+        cwd=harness, text=True,
+    ).strip()
+    with (Path(common) / "lua-arena-runner.lock").open("a") as lock:
+        try:
+            fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except BlockingIOError as error:
+            raise RuntimeError("another Lua arena runner is using this harness") from error
+        yield
+
+
+def run_game(
+    policies: dict[int, Path], output: Path, *, harness: Path = DEFAULT_HARNESS,
+    rounds: int = 10, seed: int = 1, timeout: int = 600,
+) -> dict:
+    if not 1 <= rounds <= 100:
+        raise ValueError("supported horizon is 1..100 rounds")
+    if not 0 <= seed < 2**64:
+        raise ValueError("policy seed must be an unsigned 64-bit integer")
+    if timeout <= 0:
+        raise ValueError("timeout must be positive")
+    if set(policies) != {0, 1, 62, 63}:
+        raise ValueError("assign Lua scripts to seats 0, 1, 62 and 63")
+    harness = harness.resolve()
+    if not (harness / "native" / "external_policy.h").is_file():
+        raise RuntimeError("native harness needs the external policy hook")
+    # Read all inputs before creating a run so missing scripts leave no debris.
+    scripts = {seat: path.read_bytes() for seat, path in policies.items()}
+    with runner_lock(harness):
+        output = output.resolve()
+        output.mkdir(parents=True, exist_ok=False)
+        (output / "policies").mkdir()
+        bridge = output / "lua_policy.so"
+        shutil.copy2(build_bridge(), bridge)
+        env = {key: value for key, value in os.environ.items()
+               if not key.startswith(("C6_ARENA_", "C6_NATIVE_"))}
+        env["C6_ARENA_POLICY_LIBRARY"] = str(bridge)
+        env["C6_ARENA_POLICY_TRACE"] = str(output / "decisions.jsonl")
+        copied = {}
+        for seat, source in scripts.items():
+            path = output / "policies" / f"seat-{seat}.lua"
+            path.write_bytes(source)
+            env[f"C6_ARENA_LUA_POLICY_{seat}"] = str(path)
+            copied[str(seat)] = {"source": str(policies[seat].resolve()), "sha256": digest(path)}
+        command = [
+            sys.executable, str(harness / "tools" / "benchmark.py"),
+            "--runtime", "native", "--rounds", str(rounds),
+            "--policy-seed", str(seed), "--production-pool", "settlers",
+            "--profile", "timing", "--timeout", str(timeout),
+            "--output", str(output / "native"),
+        ]
+        metadata = {"schema": 1, "seed": seed, "rounds": rounds,
+                    "policies": copied, "command": command,
+                    "harness_commit": subprocess.check_output(
+                        ["git", "rev-parse", "HEAD"], cwd=harness, text=True).strip(),
+                    "bridge_sha256": digest(bridge), "status": "running"}
+        write_json(output / "match.json", metadata)
+        with (output / "runner.log").open("w") as log:
+            process = subprocess.Popen(command, cwd=harness, env=env, stdout=log,
+                                       stderr=subprocess.STDOUT, start_new_session=True)
+            try:
+                code = process.wait(timeout=timeout + 120)
+            except (subprocess.TimeoutExpired, KeyboardInterrupt) as error:
+                # Also stop compiler/bootstrap descendants; never leave a game running.
+                os.killpg(process.pid, signal.SIGTERM)
+                try:
+                    process.wait(timeout=5)
+                except subprocess.TimeoutExpired:
+                    os.killpg(process.pid, signal.SIGKILL)
+                    process.wait()
+                metadata.update(status="timeout" if isinstance(error, subprocess.TimeoutExpired)
+                                else "interrupted", returncode=process.returncode)
+                write_json(output / "match.json", metadata)
+                if isinstance(error, KeyboardInterrupt):
+                    raise
+            else:
+                metadata.update(status="finished" if code == 0 else "failed", returncode=code)
+                write_json(output / "match.json", metadata)
+        from .inspect import inspect_game
+        summary = inspect_game(output)
+        write_json(output / "summary.json", summary)
+        return summary
+
+
+def policy_assignments(left: Path, right: Path, npc: Path | None = None) -> dict[int, Path]:
+    npc = npc or ROOT / "policies" / "random.lua"
+    return {0: left, 1: right, 62: npc, 63: npc}
