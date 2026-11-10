@@ -243,6 +243,10 @@ fast profile, or `--yield-neighbors shadow` to compare the kernel with native
 calculations. Resolved settings are retained in each match and inspection output.
 `--neighbor-geometry fast` fuses the six current neighbor lookups within that
 kernel and uses an integer-only bridge; `native` retains the earlier lookup path.
+`--candidate-yield-reuse fast` reuses production yields within one native AI
+candidate evaluation when the game holds a snapshot lock and no trade route is
+active. Other calls retain the original calculation. Use `shadow` to compare
+repeated native results before selecting `fast`.
 
 Fast runs also use the fused city plot-coordinate kernel. It reads the current
 Game, Map and offset tables and preserves native wrapping and sentinel rules.

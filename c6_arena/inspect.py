@@ -174,6 +174,7 @@ def inspect_game(directory: Path) -> dict:
         "query_bindings": match.get("query_bindings", "live"),
         "yield_neighbors": match.get("yield_neighbors", "native"),
         "neighbor_geometry": match.get("neighbor_geometry", "native"),
+        "candidate_yield_reuse": match.get("candidate_yield_reuse", "native"),
         "npc_control": match.get("npc_control"),
         "native_status": arena.get("status"), "native_phase": arena.get("phase"),
         "completed_half_turns": arena.get("completed_half_turns"),

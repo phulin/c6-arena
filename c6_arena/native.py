@@ -85,6 +85,7 @@ def run_game(
     query_bindings: str | None = None,
     yield_neighbors: str | None = None,
     neighbor_geometry: str = "native",
+    candidate_yield_reuse: str = "native",
     regional_contact: bool = False,
     start_era: str | None = None,
     trace_crash: bool = False,
@@ -117,6 +118,8 @@ def run_game(
         raise ValueError("yield_neighbors must be native, or shadow/fast with the full adapter")
     if neighbor_geometry not in ("native", "fast") or (neighbor_geometry != "native" and yield_neighbors == "native"):
         raise ValueError("fast neighbor_geometry requires the full neighbor yield kernel")
+    if candidate_yield_reuse not in ("native", "shadow", "fast") or (candidate_yield_reuse != "native" and adapter != "full"):
+        raise ValueError("candidate_yield_reuse must be native, or shadow/fast with the full adapter")
     if not 1 <= rounds <= (1000 if exploratory or until_victory else 100):
         raise ValueError("supported horizon is 1..100 rounds; explicit exploration allows 1..1000")
     if not 0 <= seed < 2**64:
@@ -186,6 +189,7 @@ def run_game(
             ])
         command.extend(["--city-player-frame", city_frame, "--yield-neighbor-kernel", yield_neighbors,
                         "--yield-neighbor-geometry", neighbor_geometry,
+                        "--candidate-yield-reuse", candidate_yield_reuse,
                         "--city-hexspace-kernel", city_geometry,
                         "--amenities-index-kernel", amenities_index])
         if start_era:
@@ -206,6 +210,7 @@ def run_game(
                     "query_bindings": query_bindings,
                     "yield_neighbors": yield_neighbors,
                     "neighbor_geometry": neighbor_geometry,
+                    "candidate_yield_reuse": candidate_yield_reuse,
                     "npc_control": "native",
                     "fixture": "+".join(fixtures) or None,
                     "start_era": start_era or "ERA_ANCIENT",
