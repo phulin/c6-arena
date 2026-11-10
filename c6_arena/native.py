@@ -11,6 +11,7 @@ import shutil
 import signal
 import subprocess
 import sys
+import uuid
 
 ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_HARNESS = ROOT.parent / "c6-native-arena"
@@ -91,12 +92,15 @@ def run_game(
             path.write_bytes(source)
             env[f"C6_ARENA_LUA_POLICY_{seat}"] = str(path)
             copied[str(seat)] = {"source": str(policies[seat].resolve()), "sha256": digest(path)}
+        # The bootstrap restricts its outputs to the harness's private namespace.
+        # Move the finished artifacts into this run after the host has exited.
+        native_output = harness / "artifacts" / f"lua-{uuid.uuid4().hex}"
         command = [
             sys.executable, str(harness / "tools" / "benchmark.py"),
             "--runtime", "native", "--rounds", str(rounds),
             "--policy-seed", str(seed), "--production-pool", "settlers",
             "--profile", "timing", "--timeout", str(timeout),
-            "--output", str(output / "native"),
+            "--output", str(native_output),
         ]
         metadata = {"schema": 1, "seed": seed, "rounds": rounds,
                     "policies": copied, "command": command,
@@ -121,10 +125,14 @@ def run_game(
                                 else "interrupted", returncode=process.returncode)
                 write_json(output / "match.json", metadata)
                 if isinstance(error, KeyboardInterrupt):
+                    if native_output.exists():
+                        shutil.move(str(native_output), output / "native")
                     raise
             else:
                 metadata.update(status="finished" if code == 0 else "failed", returncode=code)
                 write_json(output / "match.json", metadata)
+        if native_output.exists():
+            shutil.move(str(native_output), output / "native")
         from .inspect import inspect_game
         summary = inspect_game(output)
         write_json(output / "summary.json", summary)

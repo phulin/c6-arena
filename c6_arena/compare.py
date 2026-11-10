@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from .native import DEFAULT_HARNESS, policy_assignments, run_game, write_json
+from .native import DEFAULT_HARNESS, ROOT, digest, policy_assignments, run_game, write_json
 
 
 def paired_schedule(seeds: list[int]) -> list[dict]:
@@ -17,17 +17,27 @@ def paired_schedule(seeds: list[int]) -> list[dict]:
 def compare(candidate: Path, reference: Path, output: Path, *, seeds: list[int],
             rounds: int = 10, timeout: int = 600, harness: Path = DEFAULT_HARNESS) -> dict:
     schedule = paired_schedule(seeds)
+    if not 1 <= rounds <= 100 or timeout <= 0:
+        raise ValueError("rounds must be 1..100 and timeout positive")
+    scripts = {"candidate": candidate.read_bytes(), "reference": reference.read_bytes(),
+               "npc": (ROOT / "policies" / "random.lua").read_bytes()}
     output = output.resolve()
     output.mkdir(parents=True, exist_ok=False)
+    (output / "policies").mkdir()
+    snapshots = {}
+    for name, script in scripts.items():
+        snapshots[name] = output / "policies" / f"{name}.lua"
+        snapshots[name].write_bytes(script)
     games = []
     for index, case in enumerate(schedule):
-        left, right = ((candidate, reference) if case["candidate_seat"] == 0
-                       else (reference, candidate))
-        game = run_game(policy_assignments(left, right), output / f"game-{index:03d}",
+        left, right = ((snapshots["candidate"], snapshots["reference"]) if case["candidate_seat"] == 0
+                       else (snapshots["reference"], snapshots["candidate"]))
+        game = run_game(policy_assignments(left, right, snapshots["npc"]), output / f"game-{index:03d}",
                         harness=harness, rounds=rounds, seed=case["seed"], timeout=timeout)
         games.append({**case, "summary": game})
         report = {"schema": 1, "candidate": str(candidate.resolve()),
                   "reference": str(reference.resolve()), "schedule": schedule,
+                  "policy_hashes": {name: digest(path) for name, path in snapshots.items()},
                   "games": games, "completed": len(games), "requested": len(schedule),
                   "valid": len(games) == len(schedule) and all(
                       g["summary"]["outcome"] == "truncated" for g in games),

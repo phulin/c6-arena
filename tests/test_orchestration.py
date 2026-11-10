@@ -17,7 +17,8 @@ def completed_fixture(path):
         ("driver_returncode", "native_returncode", "arena_status", "effective_returncode"), 0))
     write_json(path / "native" / "arena.json", {
         "status": 0, "phase": "complete", "requested_rounds": 2,
-        "completed_half_turns": 4, "initial_turn": 0, "final_turn": 2, "final_cities": 2})
+        "completed_half_turns": 4, "initial_turn": 0, "final_turn": 2, "final_cities": 2,
+        "submitted_orders": 1, "choices": 0})
     write_json(path / "native" / "runtime.json", {"returncode": 0, **dict.fromkeys(
         ("fixture_success", "framework_cleanup_proven", "client_cleanup_proven", "native_cleanup_requested"), True)})
     row = {"sequence": 0, "owner": 0, "kind": "unit", "selected": 1, "error": None,
@@ -80,7 +81,8 @@ class SchedulingTests(unittest.TestCase):
     def test_failed_game_stops_comparison_without_promotion(self):
         with tempfile.TemporaryDirectory() as temp, patch(
                 "c6_arena.compare.run_game", return_value={"outcome": "coverage_failure"}) as run:
-            report = compare(Path("a.lua"), Path("b.lua"), Path(temp) / "comparison", seeds=[1])
+            report = compare(ROOT / "policies" / "settle.lua", ROOT / "policies" / "random.lua",
+                             Path(temp) / "comparison", seeds=[1])
             self.assertEqual(run.call_count, 1)
             self.assertFalse(report["valid"])
             self.assertIsNone(report["promotion"])
