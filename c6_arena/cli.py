@@ -25,10 +25,10 @@ def parser() -> argparse.ArgumentParser:
         command.add_argument("--adapter", choices=("full", "limited"), default="full")
         command.add_argument("--acceleration", choices=("native", "fast"),
                              help="default fast with full adapter; native for reference runs")
-        command.add_argument("--yield-neighbors", choices=("native", "shadow", "fast"), default="native",
-                             help="specialize immutable neighboring-feature yield calculations")
-        command.add_argument("--query-bindings", choices=("live", "owned"), default="live",
-                             help="owned reuses admitted stock providers; requires fast acceleration")
+        command.add_argument("--yield-neighbors", choices=("native", "shadow", "fast"),
+                             help="default fast with fast acceleration; shadow checks native results")
+        command.add_argument("--query-bindings", choices=("live", "owned"),
+                             help="default owned with fast acceleration; live rechecks providers per query")
         command.add_argument("--city-frame", choices=("native", "shadow", "fast"), default="native",
                              help="city economic kernel; shadow checks native results")
         command.add_argument("--rounds", type=int, default=None if name == "run" else 10)

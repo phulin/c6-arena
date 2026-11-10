@@ -80,8 +80,8 @@ def run_game(
     adapter: str = "full",
     acceleration: str | None = None,
     city_frame: str = "native",
-    query_bindings: str = "live",
-    yield_neighbors: str = "native",
+    query_bindings: str | None = None,
+    yield_neighbors: str | None = None,
     regional_contact: bool = False,
     start_era: str | None = None,
     trace_crash: bool = False,
@@ -94,6 +94,10 @@ def run_game(
         raise ValueError("acceleration must be native, or fast with the full adapter")
     if city_frame not in ("native", "shadow", "fast") or (city_frame != "native" and adapter != "full"):
         raise ValueError("city_frame must be native, or shadow/fast with the full adapter")
+    if query_bindings is None:
+        query_bindings = "owned" if acceleration == "fast" else "live"
+    if yield_neighbors is None:
+        yield_neighbors = "fast" if acceleration == "fast" else "native"
     if query_bindings not in ("live", "owned") or (query_bindings == "owned" and acceleration != "fast"):
         raise ValueError("owned query_bindings require fast acceleration")
     if yield_neighbors not in ("native", "shadow", "fast") or (yield_neighbors != "native" and adapter != "full"):

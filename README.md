@@ -234,6 +234,14 @@ and automatic LLM mutation remain future extensions.
 Native build caches and outputs stay ignored. The tests use real Lua against
 synthetic requests and do not need proprietary assets or sibling repositories.
 
+Fast runs also default to owned query bindings and the neighboring-feature yield
+kernel. The bindings reuse admitted stock providers for the session; the yield
+kernel indexes immutable rule contributions while reading all six current native
+neighbors on each request. NPC AI, planning, caches and observers remain native.
+Use `--query-bindings live --yield-neighbors native` to compare against the earlier
+fast profile, or `--yield-neighbors shadow` to compare the kernel with native
+calculations. Resolved settings are retained in each match and inspection output.
+
 Use `--city-frame shadow` to compare the city economic kernel with native results,
 or `--city-frame fast` to execute its admitted building, district and entertainment
 paths. The default is `native`. Tile calculations retain their native fallback
