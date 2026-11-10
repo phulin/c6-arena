@@ -22,11 +22,12 @@ def parser() -> argparse.ArgumentParser:
         command.add_argument("--reference", type=Path, default=ROOT / "policies" / "random.lua")
         command.add_argument("--harness", type=Path, default=DEFAULT_HARNESS)
         command.add_argument("--output", type=Path, required=True)
-        command.add_argument("--rounds", type=int, default=10)
+        command.add_argument("--rounds", type=int, default=None if name == "run" else 10)
         command.add_argument("--timeout", type=int, default=600)
         if name == "run":
             command.add_argument("--seed", type=int, default=1)
             command.add_argument("--explore", action="store_true", help="allow up to 1000 requested rounds; unsupported decisions still stop")
+            command.add_argument("--until-victory", action="store_true", help="require a native victory result; default safety cap 1000 rounds")
         else:
             command.add_argument("--seeds", type=int, nargs="+", default=[1, 2, 3])
     command = commands.add_parser("schedule", help="preview paired seeds and seats")
@@ -50,8 +51,10 @@ def main() -> int:
             return 0
         if args.command == "run":
             result = run_game(policy_assignments(args.candidate, args.reference), args.output,
-                              harness=args.harness, rounds=args.rounds, seed=args.seed,
-                              timeout=args.timeout, exploratory=args.explore)
+                              harness=args.harness,
+                              rounds=args.rounds if args.rounds is not None else (1000 if args.until_victory else 10),
+                              seed=args.seed, timeout=args.timeout, exploratory=args.explore,
+                              until_victory=args.until_victory)
         elif args.command == "compare":
             result = compare(args.candidate, args.reference, args.output, seeds=args.seeds,
                              harness=args.harness, rounds=args.rounds, timeout=args.timeout)

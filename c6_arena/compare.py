@@ -40,7 +40,7 @@ def compare(candidate: Path, reference: Path, output: Path, *, seeds: list[int],
                   "policy_hashes": {name: digest(path) for name, path in snapshots.items()},
                   "games": games, "completed": len(games), "requested": len(schedule),
                   "valid": len(games) == len(schedule) and all(
-                      g["summary"]["outcome"] == "truncated" for g in games),
+                      g["summary"]["outcome"] in ("truncated", "finished") for g in games),
                   "promotion": None,
                   "limits": "Seat-swapped runs use a shared initial policy seed, not "
                             "guaranteed identical subsequent RNG. No win/loss or promotion "

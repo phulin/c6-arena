@@ -55,12 +55,22 @@ def inspect_game(directory: Path) -> dict:
             missed.append({"sequence": sequence, "owner": owner, "chosen": chosen,
                            "note": "FoundCity was legal; check whether delaying it was useful."})
     rounds = match.get("rounds")
+    game_over = arena.get("game_over") is True
+    terminal = (game_over and type(arena.get("winner_team")) is int
+                and 0 <= arena["winner_team"] < 64
+                and type(arena.get("victory_type")) is int and arena["victory_type"] >= 0
+                and isinstance(arena.get("victory_name"), str) and bool(arena["victory_name"])
+                and (arena.get("winner_player") is None or
+                     type(arena["winner_player"]) is int and 0 <= arena["winner_player"] < 64))
+    terminal_within_budget = (terminal and type(rounds) is int
+        and type(arena.get("completed_half_turns")) is int
+        and 0 <= arena["completed_half_turns"] <= rounds * 2)
     checks = {
         "runner": match.get("status") == "finished" and match.get("returncode") == 0,
         "native": bool(run) and all(run.get(key) == 0 for key in (
             "driver_returncode", "native_returncode", "arena_status", "effective_returncode")),
         "boundary": arena.get("status") == 0 and arena.get("phase") == "complete",
-        "horizon": type(rounds) is int and arena.get("requested_rounds") == rounds
+        "horizon": terminal_within_budget or type(rounds) is int and arena.get("requested_rounds") == rounds
                    and arena.get("completed_half_turns") == 2 * rounds
                    and arena.get("final_turn", 0) - arena.get("initial_turn", 0) == rounds,
         "cleanup": runtime.get("returncode") == 0 and all(runtime.get(key) is True for key in (
@@ -69,12 +79,18 @@ def inspect_game(directory: Path) -> dict:
         "trace_count": type(arena.get("submitted_orders")) is int
                        and type(arena.get("choices")) is int
                        and len(decisions) == arena["submitted_orders"] + arena["choices"],
+        "terminal_result": (not game_over or terminal_within_budget)
+                           and (not match.get("until_victory") or terminal_within_budget),
     }
     complete = all(checks.values())
     return {
         "schema": 1, "directory": str(directory),
-        "outcome": "truncated" if complete else "coverage_failure",
-        "winner": None, "checks": checks, "errors": errors,
+        "outcome": ("finished" if terminal else "truncated") if complete else "coverage_failure",
+        "winner": arena.get("winner_player") if complete and terminal else None,
+        "winner_team": arena.get("winner_team") if complete and terminal else None,
+        "victory_type": arena.get("victory_type") if complete and terminal else None,
+        "victory_name": arena.get("victory_name") if complete and terminal else None,
+        "game_over": bool(complete and terminal), "checks": checks, "errors": errors,
         "rounds": rounds, "seed": match.get("seed"),
         "exploratory": match.get("exploratory", False),
         "native_status": arena.get("status"), "native_phase": arena.get("phase"),
@@ -93,9 +109,9 @@ def inspect_game(directory: Path) -> dict:
         "trace": str(trace),
         "failure_detail": (directory / "runner.log").read_text()[-2000:]
                           if not checks["runner"] and (directory / "runner.log").exists() else None,
-        "limits": "Bounded early-game run. City/unit totals combine both major seats. "
-                  "Legal options are the harness subset. No full-game result, strength rating, "
-                  "counterfactual replay, or complete policy observation is available.",
+        "limits": "Winner fields require the native victory manager and successful cleanup. "
+                  "City/unit totals combine both major seats. Legal choices and observations "
+                  "are limited to those supplied by the native adapter.",
     }
 
 

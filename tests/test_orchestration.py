@@ -39,6 +39,31 @@ class InspectionTests(unittest.TestCase):
         self.assertIsNone(result["winner"])
         self.assertEqual(result["delayed_founding_choices"], 1)
 
+    def test_actual_native_victory_can_finish_before_requested_horizon(self):
+        arena = json.loads((self.path / "native/arena.json").read_text())
+        arena.update(game_over=True, winner_team=7, winner_player=1, victory_type=2,
+                     victory_name="VICTORY_SCORE", completed_half_turns=3, final_turn=1)
+        write_json(self.path / "native/arena.json", arena)
+        result = inspect_game(self.path)
+        self.assertEqual(result["outcome"], "finished")
+        self.assertEqual(result["winner"], 1)
+        self.assertEqual(result["winner_team"], 7)
+        self.assertEqual(result["victory_name"], "VICTORY_SCORE")
+
+    def test_partial_victory_record_is_not_a_win(self):
+        arena = json.loads((self.path / "native/arena.json").read_text())
+        arena.update(game_over=True, winner_player=1)
+        write_json(self.path / "native/arena.json", arena)
+        result = inspect_game(self.path)
+        self.assertEqual(result["outcome"], "coverage_failure")
+        self.assertIsNone(result["winner"])
+
+    def test_full_game_request_cannot_succeed_from_horizon_only(self):
+        match = json.loads((self.path / "match.json").read_text())
+        match["until_victory"] = True
+        write_json(self.path / "match.json", match)
+        self.assertEqual(inspect_game(self.path)["outcome"], "coverage_failure")
+
     def test_partial_run_is_coverage_failure(self):
         arena = json.loads((self.path / "native" / "arena.json").read_text())
         arena["completed_half_turns"] = 3
