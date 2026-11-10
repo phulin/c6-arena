@@ -126,6 +126,13 @@ class ScienceStrategyTests(unittest.TestCase):
             {"name": "VOTE", "blocks_own_victory": True},
             {"name": "VOTE", "science_bonus": 1}])["selected"], 2)
 
+    def test_governor_promotions_follow_science_then_space_plan(self):
+        self.assertEqual(self.choose("governor", ["GOVERNOR_THE_RESOURCE_MANAGER",
+            "GOVERNOR_PROMOTION_EDUCATOR_RESEARCHER"])["selected"], 2)
+        self.assertEqual(self.choose("governor", ["GOVERNOR_PROMOTION_RESOURCE_MANAGER_INDUSTRIALIST",
+            "GOVERNOR_PROMOTION_EDUCATOR_SPACE_INITIATIVE"], observation={
+                "known_technologies": {"TECH_ROCKETRY": True}})["selected"], 2)
+
     def test_city_citizens_do_not_starve_for_production(self):
         self.assertEqual(self.choose("city_citizens", options=[
             {"name": "ASSIGN", "production": 50, "starvation": True},

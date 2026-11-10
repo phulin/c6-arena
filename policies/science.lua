@@ -273,8 +273,18 @@ local function score_option(ctx, option, s)
     end
     if kind == "governor" then
         local scores = {GOVERNOR_THE_EDUCATOR=180, GOVERNOR_THE_RESOURCE_MANAGER=160,
-            GOVERNOR_THE_BUILDER=130, GOVERNOR_THE_DEFENDER=50}
+            GOVERNOR_THE_BUILDER=130, GOVERNOR_THE_DEFENDER=50,
+            GOVERNOR_PROMOTION_EDUCATOR_RESEARCHER=260,
+            GOVERNOR_PROMOTION_EDUCATOR_CONNOISSEUR=205,
+            GOVERNOR_PROMOTION_EDUCATOR_GRANTS=220,
+            GOVERNOR_PROMOTION_EDUCATOR_SPACE_INITIATIVE=140,
+            GOVERNOR_PROMOTION_RESOURCE_MANAGER_INDUSTRIALIST=230,
+            GOVERNOR_PROMOTION_RESOURCE_MANAGER_VERTICAL_INTEGRATION=240,
+            GOVERNOR_PROMOTION_RESOURCE_MANAGER_SURPLUS_LOGISTICS=180,
+            GOVERNOR_PROMOTION_RESOURCE_MANAGER_EXPEDITION=190}
         local score = scores[n] or 0
+        if n == "GOVERNOR_PROMOTION_EDUCATOR_SPACE_INITIATIVE" and
+            (s.phase == "space" or s.phase == "accelerate") then score = 400 end
         if option.space_production then score = score + option.space_production * 20 end
         if option.science then score = score + option.science * 15 end
         if option.defends_city then score = score + s.threat * 200 end
