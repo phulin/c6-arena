@@ -83,11 +83,13 @@ class InspectionTests(unittest.TestCase):
     def test_native_stop_details_survive_in_inspection(self):
         runtime = json.loads((self.path / "native/runtime.json").read_text())
         runtime["stderr"] = ("C6_ARENA unit_progress_refusal reason=actor_busy\n"
-                             "C6_AI_PREP unavailable native_score_consumer 0x1fdf2d0\n")
+                             "C6_AI_PREP unavailable native_score_consumer 0x1fdf2d0\n"
+                             "C6_WHITELIST private_planner_reads_unavailable 0\n")
         write_json(self.path / "native/runtime.json", runtime)
         result = inspect_game(self.path)
         self.assertIn("actor_busy", result["native_failures"][0])
         self.assertIn("native_score_consumer", result["native_failures"][1])
+        self.assertEqual(len(result["native_failures"]), 2)
         self.assertEqual(result["final_turn"], 2)
 
     def test_missing_and_broken_trace(self):

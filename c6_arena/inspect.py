@@ -104,8 +104,10 @@ def inspect_game(directory: Path) -> dict:
         "initial_turn": arena.get("initial_turn"), "final_turn": arena.get("final_turn"),
         "pending_decision": arena.get("pending_decision"),
         "native_failures": [line for line in runtime.get("stderr", "").splitlines()
-                            if line.startswith("C6_") and any(token in line.lower() for token in (
-                                "unsupported", "unavailable", "refusal", "failure", "choice_failed", "boundary_stall"))][-10:],
+                            if line.startswith("C6_") and (
+                                line.startswith("C6_AI_PREP unavailable ") or
+                                any(token in line.lower() for token in (
+                                    "unsupported", "refusal", "failure", "choice_failed", "boundary_stall")))][-10:],
         "policies": match.get("policies", {}),
         "diagnostics": {key: arena.get(key) for key in (
             "final_cities", "final_units", "founded_cities", "submitted_orders",
