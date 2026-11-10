@@ -76,6 +76,7 @@ def inspect_game(directory: Path) -> dict:
         "outcome": "truncated" if complete else "coverage_failure",
         "winner": None, "checks": checks, "errors": errors,
         "rounds": rounds, "seed": match.get("seed"),
+        "exploratory": match.get("exploratory", False),
         "policies": match.get("policies", {}),
         "diagnostics": {key: arena.get(key) for key in (
             "final_cities", "final_units", "founded_cities", "submitted_orders",

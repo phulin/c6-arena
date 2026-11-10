@@ -129,6 +129,8 @@ class SchedulingTests(unittest.TestCase):
         for rounds in (0, 101):
             with self.assertRaises(ValueError):
                 run_game({}, Path("unused"), rounds=rounds)
+        with self.assertRaises(ValueError):
+            run_game({}, Path("unused"), rounds=1001, exploratory=True)
 
 
 if __name__ == "__main__":

@@ -75,9 +75,10 @@ def runner_lock(harness: Path):
 def run_game(
     policies: dict[int, Path], output: Path, *, harness: Path = DEFAULT_HARNESS,
     rounds: int = 10, seed: int = 1, timeout: int = 600,
+    exploratory: bool = False,
 ) -> dict:
-    if not 1 <= rounds <= 100:
-        raise ValueError("supported horizon is 1..100 rounds")
+    if not 1 <= rounds <= (1000 if exploratory else 100):
+        raise ValueError("supported horizon is 1..100 rounds; explicit exploration allows 1..1000")
     if not 0 <= seed < 2**64:
         raise ValueError("policy seed must be an unsigned 64-bit integer")
     if timeout <= 0:
@@ -119,6 +120,7 @@ def run_game(
             "--output", str(native_output),
         ]
         metadata = {"schema": 1, "seed": seed, "rounds": rounds,
+                    "exploratory": exploratory,
                     "policies": copied, "command": command,
                     "harness_commit": subprocess.check_output(
                         ["git", "rev-parse", "HEAD"], cwd=harness, text=True).strip(),

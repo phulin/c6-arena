@@ -149,6 +149,10 @@ This runner caps games at 100 rounds and stops on unsupported decisions. A
 successful horizon is reported as `truncated`; incomplete execution is
 `coverage_failure`. Neither is recorded as a policy win or loss.
 
+For an explicit boundary-discovery run, `run --explore --rounds 500` permits a
+longer requested horizon (up to 1000). This does not add decision coverage or
+victory detection; unsupported branches still stop and no winner is inferred.
+
 The native API exposes the existing legal-choice subset, not a complete map or
 player observation. It covers unit orders, production, research, civics and era
 choices. World Congress and other unsupported branches still stop explicitly.
