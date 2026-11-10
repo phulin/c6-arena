@@ -269,6 +269,13 @@ local function score_option(ctx, option, s)
         return (scores[n] or 0) + (s.phase == "expand" and n == "COMMEMORATION_INFRASTRUCTURE" and 100 or 0)
     end
     if kind == "diplomacy" or kind == "trade" then return diplomacy(option, s) end
+    if kind:sub(1,10) == "diplomacy_" then
+        if n == "POSITIVE" then return 30 end
+        if n == "REJECT" or n == "PASS" or n == "ACKNOWLEDGE" then return 10 end
+        return 0
+    end
+    if kind == "spy_escape" then return n == "DISTRICT_CITY_CENTER" and 10 or 0 end
+    if kind == "rebel_unit" then return army[n] and 10 or 0 end
     if kind == "player_action" then
         if n == "RECRUIT_GREAT_PERSON" then return 180 end
         if n == "GIVE_INFLUENCE_TOKEN" then return 40 end
@@ -286,12 +293,19 @@ local function score_option(ctx, option, s)
         return -10
     end
     if kind == "great_work" then return (n == "KEEP" or n == "PASS" or n == "KEEP_GREAT_WORKS") and 10 or 0 end
+    if kind == "government_optional" then
+        if n == "REASSIGN_POLICIES" or n == "APPLY_POLICY_CHANGES" then return 10 end
+        if n == "PASS" then return 0 end
+        if n ~= "CHANGE_GOVERNMENT" or not option.government_name then return -10 end
+        n = option.government_name
+        kind = "government"
+    end
     if kind == "government" then
         local scores = {GOVERNMENT_CLASSICAL_REPUBLIC=100, GOVERNMENT_MERCHANT_REPUBLIC=180,
             GOVERNMENT_DEMOCRACY=250, GOVERNMENT_SYNTHETIC_TECHNOCRACY=350}
         return (scores[n] or 0) - (option.anarchy_turns or 0) * 40
     end
-    if kind == "policy" then
+    if kind == "policy" or kind == "policy_optional" then
         local scores = {POLICY_URBAN_PLANNING=80, POLICY_DISCIPLINE=50, POLICY_COLONIZATION=110,
             POLICY_NATURAL_PHILOSOPHY=160, POLICY_RATIONALISM=200, POLICY_FIVE_YEAR_PLAN=220,
             POLICY_INTERNATIONAL_SPACE_AGENCY=300, POLICY_INTEGRATED_SPACE_CELL=310,
