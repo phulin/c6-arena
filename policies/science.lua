@@ -315,8 +315,10 @@ local function score_option(ctx, option, s)
         if n == "REASSIGN_POLICIES" or n == "APPLY_POLICY_CHANGES" then return 10 end
         if n == "PASS" then return 0 end
         if n ~= "CHANGE_GOVERNMENT" or not option.government_name then return -10 end
-        n = option.government_name
-        kind = "government"
+        local scores = {GOVERNMENT_CLASSICAL_REPUBLIC=100, GOVERNMENT_MERCHANT_REPUBLIC=180,
+            GOVERNMENT_DEMOCRACY=250, GOVERNMENT_SYNTHETIC_TECHNOCRACY=350}
+        return (scores[option.government_name] or 0) - (scores[option.current_government_name] or 0)
+            - (option.anarchy_turns or 0) * 40
     end
     if kind == "government" then
         local scores = {GOVERNMENT_CLASSICAL_REPUBLIC=100, GOVERNMENT_MERCHANT_REPUBLIC=180,

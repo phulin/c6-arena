@@ -166,6 +166,14 @@ class ScienceStrategyTests(unittest.TestCase):
         observation["turn"] += 1
         self.assertEqual(self.choose("city_economy", options=menu, observation=observation)["selected"], 2)
 
+    def test_native_government_menu_does_not_downgrade_or_enter_pointless_anarchy(self):
+        options = [{"name": "PASS"}, {"name": "CHANGE_GOVERNMENT", "metadata": {
+            "government_name": "GOVERNMENT_CLASSICAL_REPUBLIC", "current_government_name": "GOVERNMENT_DEMOCRACY",
+            "anarchy_turns": 3}}]
+        self.assertEqual(self.choose("government_optional", options=options)["selected"], 1)
+        options[1]["metadata"].update(government_name="GOVERNMENT_SYNTHETIC_TECHNOCRACY", anarchy_turns=0)
+        self.assertEqual(self.choose("government_optional", options=options)["selected"], 2)
+
     def test_governor_promotions_follow_science_then_space_plan(self):
         self.assertEqual(self.choose("governor", ["GOVERNOR_THE_RESOURCE_MANAGER",
             "GOVERNOR_PROMOTION_EDUCATOR_RESEARCHER"])["selected"], 2)
