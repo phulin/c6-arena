@@ -84,7 +84,7 @@ def run_game(
     city_geometry: str | None = None,
     query_bindings: str | None = None,
     yield_neighbors: str | None = None,
-    neighbor_geometry: str = "native",
+    neighbor_geometry: str | None = None,
     candidate_yield_reuse: str = "native",
     regional_contact: bool = False,
     start_era: str | None = None,
@@ -116,6 +116,8 @@ def run_game(
         raise ValueError("owned query_bindings require fast acceleration")
     if yield_neighbors not in ("native", "shadow", "fast") or (yield_neighbors != "native" and adapter != "full"):
         raise ValueError("yield_neighbors must be native, or shadow/fast with the full adapter")
+    if neighbor_geometry is None:
+        neighbor_geometry = "fast" if acceleration == "fast" and yield_neighbors != "native" else "native"
     if neighbor_geometry not in ("native", "fast") or (neighbor_geometry != "native" and yield_neighbors == "native"):
         raise ValueError("fast neighbor_geometry requires the full neighbor yield kernel")
     if candidate_yield_reuse not in ("native", "shadow", "fast") or (candidate_yield_reuse != "native" and adapter != "full"):

@@ -27,8 +27,8 @@ def parser() -> argparse.ArgumentParser:
                              help="default fast with full adapter; native for reference runs")
         command.add_argument("--yield-neighbors", choices=("native", "shadow", "fast"),
                              help="default fast with fast acceleration; shadow checks native results")
-        command.add_argument("--neighbor-geometry", choices=("native", "fast"), default="native",
-                             help="fuse the six neighbor lookups within the yield kernel")
+        command.add_argument("--neighbor-geometry", choices=("native", "fast"),
+                             help="default fast with fast acceleration and the neighbor yield kernel")
         command.add_argument("--candidate-yield-reuse", choices=("native", "shadow", "fast"), default="native",
                              help="reuse production yields during native AI candidate evaluation")
         command.add_argument("--query-bindings", choices=("live", "owned"),
