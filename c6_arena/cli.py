@@ -23,7 +23,7 @@ def parser() -> argparse.ArgumentParser:
         command.add_argument("--harness", type=Path, default=DEFAULT_HARNESS)
         command.add_argument("--output", type=Path, required=True)
         command.add_argument("--rounds", type=int, default=None if name == "run" else 10)
-        command.add_argument("--timeout", type=int, default=600)
+        command.add_argument("--timeout", type=int, default=None if name == "run" else 600)
         if name == "run":
             command.add_argument("--seed", type=int, default=1)
             command.add_argument("--explore", action="store_true", help="allow up to 1000 requested rounds; unsupported decisions still stop")
@@ -53,7 +53,9 @@ def main() -> int:
             result = run_game(policy_assignments(args.candidate, args.reference), args.output,
                               harness=args.harness,
                               rounds=args.rounds if args.rounds is not None else (1000 if args.until_victory else 10),
-                              seed=args.seed, timeout=args.timeout, exploratory=args.explore,
+                              seed=args.seed,
+                              timeout=args.timeout if args.timeout is not None else (1800 if args.until_victory else 600),
+                              exploratory=args.explore,
                               until_victory=args.until_victory)
         elif args.command == "compare":
             result = compare(args.candidate, args.reference, args.output, seeds=args.seeds,

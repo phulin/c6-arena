@@ -2,7 +2,7 @@
 -- runtime supplies only permitted observations and already-legal choices.
 -- The current native adapter supplies fewer observations/actions than the richer
 -- context interface. Missing information is not treated as knowledge of the map.
-local memory = {founded = 0, settlers_ordered = 0, visits = {}, trails = {}, last = {}, orders = {}, governors = {}}
+local memory = {founded = 0, settlers_ordered = 0, visits = {}, trails = {}, last = {}, orders = {}, governors = {}, unit_types = {}}
 local function name(option) return string.upper(option.name or option.action or "") end
 local function key(x, y) return tostring(x) .. "," .. tostring(y) end
 local function clamp(x, a, b) return math.max(a, math.min(b, x)) end
@@ -155,9 +155,10 @@ end
 local function unit_action(option, s)
     local n = name(option)
     local unit = s.units[option.actor] or {}
+    local unit_type = unit.type or memory.unit_types[option.actor]
     local hp = unit.health and unit.health / (unit.max_health or 100) or 1
     local civilian = unit.role == "settler" or unit.role == "builder" or unit.role == "trader"
-        or unit.type == "UNIT_SETTLER" or unit.type == "UNIT_BUILDER" or unit.type == "UNIT_TRADER"
+        or unit_type == "UNIT_SETTLER" or unit_type == "UNIT_BUILDER" or unit_type == "UNIT_TRADER"
     local score = -50
     if n == "FOUND_CITY" then
         score = s.city_count == 0 and 1000 or 600
@@ -236,6 +237,12 @@ local function diplomacy(option, s)
 end
 local function score_option(ctx, option, s)
     local n, kind = name(option), ctx.kind
+    if kind == "unit_selection" then
+        if n == "UNIT_SETTLER" then return 200 end
+        if n == "UNIT_SCOUT" then return 150 end
+        if n == "UNIT_BUILDER" then return 100 end
+        return 10
+    end
     if kind == "production" then return production(option, s) end
     if kind == "unit" then return unit_action(option, s) end
     if kind == "research" or kind == "civic" then
@@ -332,6 +339,9 @@ local function score_option(ctx, option, s)
 end
 return function(ctx)
     assert(type(ctx.options) == "table" and #ctx.options > 0, "no legal options")
+    if ctx.kind == "unit_selection" then
+        for _, option in ipairs(ctx.options) do memory.unit_types[option.actor] = name(option) end
+    end
     local s = situation(ctx)
     local best = ctx.random_index or 1
     local best_score = score_option(ctx, ctx.options[best], s)

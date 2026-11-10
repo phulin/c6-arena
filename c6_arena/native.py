@@ -104,6 +104,7 @@ def run_game(
         if until_victory:
             env["C6_ARENA_REQUIRE_VICTORY"] = "1"
             env["C6_ARENA_MAX_ACTIONS"] = "4096"
+            env["C6_ARENA_UNIT_SELECTION"] = "per-unit"
         copied = {}
         for seat, source in scripts.items():
             path = output / "policies" / f"seat-{seat}.lua"
@@ -126,6 +127,7 @@ def run_game(
         metadata = {"schema": 1, "seed": seed, "rounds": rounds,
                     "exploratory": exploratory,
                     "until_victory": until_victory,
+                    "unit_selection": "per-unit" if until_victory else "pooled",
                     "policies": copied, "command": command,
                     "harness_commit": subprocess.check_output(
                         ["git", "rev-parse", "HEAD"], cwd=harness, text=True).strip(),

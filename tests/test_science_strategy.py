@@ -24,6 +24,15 @@ class ScienceStrategyTests(unittest.TestCase):
         self.assertEqual(choice["option"]["name"], "found_city")
         self.assertIn("science/expand", choice["reason"])
 
+    def test_choose_settler_before_other_units_then_choose_its_order(self):
+        choice = self.choose("unit_selection", options=[
+            {"name": "UNIT_WARRIOR", "actor": 1}, {"name": "UNIT_SETTLER", "actor": 2}])
+        self.assertEqual(choice["option"]["actor"], 2)
+        choice = self.choose("unit", options=[
+            {"name": "move", "actor": 2, "threat": 1, "goody_hut": True},
+            {"name": "move", "actor": 2, "threat": 0}])
+        self.assertEqual(choice["selected"], 2)
+
     def test_growth_policy_changes_when_threatened(self):
         names = ["UNIT_SETTLER", "BUILDING_GRANARY", "UNIT_ARCHER"]
         peaceful = self.choose("production", names, observation={"player": {"city_count": 2},
