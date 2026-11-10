@@ -79,6 +79,7 @@ def run_game(
     until_victory: bool = False,
     adapter: str = "full",
     regional_contact: bool = False,
+    start_era: str | None = None,
 ) -> dict:
     if adapter not in ("full", "limited"):
         raise ValueError("adapter must be full or limited")
@@ -135,12 +136,18 @@ def run_game(
         ]
         if regional_contact:
             command.append("--regional-contact")
+        if start_era:
+            command.extend(["--start-era", start_era])
+        fixtures = (["regional-contact"] if regional_contact else [])
+        if start_era and start_era != "ERA_ANCIENT":
+            fixtures.append(f"start-era:{start_era}")
         metadata = {"schema": 1, "seed": seed, "rounds": rounds,
                     "exploratory": exploratory,
                     "until_victory": until_victory,
                     "adapter": adapter,
                     "npc_control": "native",
-                    "fixture": "regional-contact" if regional_contact else None,
+                    "fixture": "+".join(fixtures) or None,
+                    "start_era": start_era or "ERA_ANCIENT",
                     "unit_selection": "per-unit" if until_victory or adapter == "full" else "pooled",
                     "policies": copied, "command": command,
                     "harness_commit": subprocess.check_output(
